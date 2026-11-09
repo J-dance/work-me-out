@@ -1,8 +1,8 @@
 
 export class Timer {
   private duration: number
-  private endTime: number
-  private interval: number
+  private endTime: number = 0
+  private interval: ReturnType<typeof setInterval> | undefined
 
   private onUpdate: (time: number) => void
   private onFinsih: () => void
@@ -21,7 +21,7 @@ export class Timer {
     this.endTime = endTime
   }
 
-  public setInterval(interval: number): void {
+  public setInterval(interval: ReturnType<typeof setInterval>): void {
     this.interval = interval
   }
 
@@ -63,6 +63,6 @@ export class Timer {
 
   public resetTimer() {
     this.stopTimer()
-    this.setEndTime(null)
+    this.setEndTime(0)
   }
 }

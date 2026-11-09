@@ -4,7 +4,7 @@ interface props { children: React.ReactNode, setScreen: (screen: Screen) => void
 
 export default function Layout({ children, setScreen, title }: props) {
   return (
-    <div className="flex flex-col items-center justify-between h-screen w-screen gap-4 bg-bg p-6">
+    <div className="flex flex-col items-center justify-between h-full w-full gap-4 bg-bg p-6">
       <header>
         <h2 className="text-3xl">{title}</h2>
       </header>

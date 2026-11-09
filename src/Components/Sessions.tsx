@@ -1,6 +1,6 @@
 import Layout from "./Layout";
 import type { Screen, Workout } from "../types";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Timer } from "../utils";
 
 const testWorkout: Workout = {
@@ -26,7 +26,7 @@ const testData = [
  * @returns The session screen
  */
 export default function Session({ setScreen }: { setScreen: (screen: Screen) => void }) {
-  const [workout, setWorkout] = useState<Workout>(null)
+  const [workout, setWorkout] = useState<Workout | null>(null)
 
   return (
     <Layout setScreen={setScreen} title={"Lets Go!"}>{
@@ -41,7 +41,7 @@ export default function Session({ setScreen }: { setScreen: (screen: Screen) => 
 }
 
 function WorkoutComponent({ workout }: { workout: Workout }) {
-  const [index, setIndex] = useState<number>(0)
+  const [index, setIndex] = useState<number | null>(0)
 
   return (
     <>
@@ -51,6 +51,7 @@ function WorkoutComponent({ workout }: { workout: Workout }) {
       }
 
       <TimerComponent nextIndex={() => {
+        if (index === null) return
         if (index === workout.exerciseIds.length - 2) setIndex(null) // finished
         else setIndex(index + 1)
       }} />
@@ -62,15 +63,21 @@ function TimerComponent({ nextIndex }: { nextIndex: () => void }) {
   const [time, setTime] = useState<number>(0) // time in seconds
   const [isRunning, setIsRunning] = useState<boolean>(false)
 
-  function updateTimer(time: number) {
-    setTime(time)
-  }
+  // keep the latest callback so the Timer (created once) never calls a stale one
+  const nextIndexRef = useRef(nextIndex)
+  useEffect(() => { nextIndexRef.current = nextIndex })
 
-  const finishTimer = () => {
-    alert("Timer is done!")
-  }
-
-  const TimerCtr = useRef<Timer>(new Timer(updateTimer, finishTimer, 10))
+  // create the Timer once on mount, and stop it on unmount
+  const TimerCtr = useRef<Timer | null>(null)
+  useEffect(() => {
+    const timer = new Timer(setTime, () => {
+      alert("Timer is done!")
+      setIsRunning(false)
+      nextIndexRef.current()
+    }, 10)
+    TimerCtr.current = timer
+    return () => timer.stopTimer()
+  }, [])
   return (
     <>
       <div>
@@ -78,11 +85,11 @@ function TimerComponent({ nextIndex }: { nextIndex: () => void }) {
         {
           isRunning ?
             <button onClick={() => {
-              TimerCtr.current.stopTimer()
+              TimerCtr.current?.stopTimer()
               setIsRunning(false)
             }}>Stop</button> :
             <button onClick={() => {
-              TimerCtr.current.startTimer()
+              TimerCtr.current?.startTimer()
               setIsRunning(true)
             }}>Start</button>
         }
@@ -101,7 +108,7 @@ function SelectWorkout({ setWorkout }: { setWorkout: (workout: Workout) => void 
       }}>
         {
           testData.map((workout) => (
-            <option value={workout.id}>{workout.name}</option>
+            <option key={workout.id} value={workout.id}>{workout.name}</option>
           ))
         }
       </select>

@@ -1,6 +1,6 @@
 import Layout from "./Layout"
 import type { Screen } from '../types'
-import { UserContext } from "../App"
+import { UserContext } from "../context"
 import { useContext } from "react"
 
 /**
@@ -13,7 +13,7 @@ export default function Workouts({ setScreen }: { setScreen: (screen: Screen) =>
   return (
     <Layout setScreen={setScreen} title="Workouts">
       <section>
-        <button className="p-8 rounded-full border-solid border-8 border-tertiary text-5xl aspect-square hover:bg-tertiary hover:cursor-pointer" onClick={() => { context.setState() }}>+</button>
+        <button className="p-8 rounded-full border-solid border-8 border-tertiary text-5xl aspect-square hover:bg-tertiary hover:cursor-pointer" onClick={() => { context?.setState(undefined) }}>+</button>
       </section>
     </Layout>
   )
