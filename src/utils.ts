@@ -1,3 +1,5 @@
+import type { Workout } from "./types"
+
 
 export class Timer {
   private duration: number
@@ -64,5 +66,45 @@ export class Timer {
   public resetTimer() {
     this.stopTimer()
     this.setEndTime(0)
+  }
+}
+
+const WORKOUTS_KEY = 'workouts'
+
+/** Short unique id. Avoids crypto.randomUUID, which is missing outside secure contexts (e.g. testing over LAN http). */
+export const uid = (): string => Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+
+/** Saved workouts from localStorage, or an empty list if none/unreadable. */
+export const loadWorkouts = (): Workout[] => {
+  try {
+    const data: unknown = JSON.parse(localStorage.getItem(WORKOUTS_KEY) ?? '[]')
+    return Array.isArray(data) ? data as Workout[] : []
+  } catch {
+    return []
+  }
+}
+
+export const saveWorkouts = (workouts: Workout[]): void => {
+  localStorage.setItem(WORKOUTS_KEY, JSON.stringify(workouts))
+}
+
+/** Seconds as m:ss, e.g. 90 -> "1:30". */
+export const formatDuration = (seconds: number): string => {
+  const m = Math.floor(seconds / 60)
+  const s = Math.round(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+// number of open dialogs holding the page scroll lock
+let scrollLocks = 0
+
+/**
+ * Stops the page behind a dialog from scrolling. Returns the unlock function.
+ * Counted, so stacked dialogs can open and close in any order without leaving the page stuck.
+ */
+export const lockScroll = (): (() => void) => {
+  if (scrollLocks++ === 0) document.body.style.overflow = 'hidden'
+  return () => {
+    if (--scrollLocks === 0) document.body.style.overflow = ''
   }
 }

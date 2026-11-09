@@ -2,11 +2,7 @@ import { use, useDeferredValue, useEffect, useMemo, useRef, useState } from "rea
 import Layout from "./Layout"
 import type { Screen, Exercise } from '../types'
 import { ExercisesContext } from "../context"
-import { imgBase } from "./ExerciseProvider"
-
-const Tag = ({ children }: { children: React.ReactNode }) => (
-  <span className="rounded-full bg-tertiary px-3 py-1 text-sm capitalize">{children}</span>
-)
+import ExerciseModal from "./ExerciseModal"
 
 /**
  * Compact card shown in the exercise list.
@@ -28,95 +24,6 @@ const ExerciseCard = ({ data, onSelect }: { data: Exercise, onSelect: () => void
   )
 }
 
-/**
- * Full-screen detail view for a single exercise.
- */
-const ExerciseModal = ({ data, onClose }: { data: Exercise, onClose: () => void }) => {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    dialogRef.current?.showModal()
-    // stop the list behind the modal from scrolling
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prevOverflow }
-  }, [])
-
-  const details: [string, string | null][] = [
-    ['Level', data.level],
-    ['Category', data.category],
-    ['Equipment', data.equipment],
-    ['Force', data.force],
-    ['Mechanic', data.mechanic],
-  ]
-
-  return (
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-bg text-white backdrop:bg-black/60"
-    >
-      <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-        <header className="flex items-start justify-between gap-4">
-          <h2 className="text-3xl">{data.name}</h2>
-          <button
-            type="button"
-            onClick={() => dialogRef.current?.close()}
-            aria-label="Close"
-            className="shrink-0 border-2 border-tertiary px-3 py-1 text-xl hover:border-primary"
-          >
-            ✕
-          </button>
-        </header>
-
-        {data.images.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto">
-            {data.images.map((src) => (
-              <img
-                key={src}
-                src={imgBase + src}
-                alt={data.name}
-                loading="lazy"
-                className="w-full max-w-sm shrink-0 object-cover"
-              />
-            ))}
-          </div>
-        )}
-
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-          {details.filter(([, value]) => value).map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-sm opacity-70">{label}</dt>
-              <dd className="capitalize">{value}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <section className="flex flex-col gap-2">
-          <h3 className="text-xl">Muscles</h3>
-          <div className="flex flex-wrap gap-2">
-            {data.primaryMuscles.map((m) => <Tag key={m}>{m}</Tag>)}
-          </div>
-          {data.secondaryMuscles.length > 0 && (
-            <div className="flex flex-wrap gap-2 opacity-70">
-              {data.secondaryMuscles.map((m) => <Tag key={m}>{m}</Tag>)}
-            </div>
-          )}
-        </section>
-
-        {data.instructions.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <h3 className="text-xl">Instructions</h3>
-            <ol className="flex list-decimal flex-col gap-2 pl-5">
-              {data.instructions.map((step, i) => <li key={i}>{step}</li>)}
-            </ol>
-          </section>
-        )}
-      </div>
-    </dialog>
-  )
-}
-
 type Filters = {
   search: string
   muscle: string
@@ -129,6 +36,9 @@ const emptyFilters: Filters = { search: '', muscle: '', level: '', category: '',
 
 // stable fallback so memoised filters don't recompute every render
 const noExercises: Exercise[] = []
+
+// how many cards to render per "page" of the infinite scroll
+const PAGE_SIZE = 30
 
 /** Sorted unique values from a list, dropping nulls. */
 const uniqueSorted = <T extends string>(values: (T | null)[]): T[] =>
@@ -156,11 +66,12 @@ const FilterSelect = ({ label, value, options, onChange }: {
 /**
  * Search box plus dropdown filters for the exercise list.
  */
-const FilterBar = ({ filters, setFilters, options, resultCount }: {
+const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
   filters: Filters
   setFilters: (filters: Filters) => void
   options: { muscle: string[], level: string[], category: string[], equipment: string[] }
   resultCount: number
+  shownCount: number
 }) => {
   const update = (key: keyof Filters) => (value: string) => setFilters({ ...filters, [key]: value })
   const isFiltered = Object.values(filters).some(Boolean)
@@ -181,7 +92,10 @@ const FilterBar = ({ filters, setFilters, options, resultCount }: {
         <FilterSelect label="Equipment" value={filters.equipment} options={options.equipment} onChange={update('equipment')} />
       </div>
       <div className="flex items-center justify-between text-sm">
-        <span className="opacity-70">{resultCount} exercise{resultCount === 1 ? '' : 's'}</span>
+        <span className="opacity-70">
+          {shownCount < resultCount && `Showing ${shownCount} of `}
+          {resultCount} exercise{resultCount === 1 ? '' : 's'}
+        </span>
         {isFiltered && (
           <button type="button" onClick={() => setFilters(emptyFilters)} className="underline hover:text-primary">
             Clear filters
@@ -201,6 +115,9 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
   const exercises = exercisesPromise ? use(exercisesPromise) : noExercises
   const [selected, setSelected] = useState<Exercise | null>(null)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  // empty element after the last card; when it scrolls into view we load the next page
+  const sentinelRef = useRef<HTMLLIElement>(null)
   // keeps typing responsive while the (long) list re-filters in the background
   const deferredFilters = useDeferredValue(filters)
 
@@ -224,15 +141,44 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
     )
   }, [exercises, deferredFilters])
 
+  const visible = filtered.slice(0, visibleCount)
+  const hasMore = visibleCount < filtered.length
+
+  // any filter change starts the list again from the first page
+  const updateFilters = (next: Filters) => {
+    setFilters(next)
+    setVisibleCount(PAGE_SIZE)
+  }
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    // re-created whenever visibleCount changes: a new observer reports straight away,
+    // so if the sentinel is still on screen (e.g. tall display) the next page loads too
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisibleCount((c) => c + PAGE_SIZE) },
+      { rootMargin: '100px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [visibleCount, hasMore])
+
   return (
     <Layout setScreen={setScreen} title="Exercises">
-      <FilterBar filters={filters} setFilters={setFilters} options={options} resultCount={filtered.length} />
+      <FilterBar
+        filters={filters}
+        setFilters={updateFilters}
+        options={options}
+        resultCount={filtered.length}
+        shownCount={visible.length}
+      />
       <ul className="flex h-full w-full flex-col gap-4 p-4">
-        {filtered.map((data) => (
+        {visible.map((data) => (
           <li key={data.id}>
             <ExerciseCard data={data} onSelect={() => setSelected(data)} />
           </li>
         ))}
+        {hasMore && <li ref={sentinelRef} aria-hidden="true" className="h-px" />}
         {filtered.length === 0 && (
           <li className="text-center opacity-70">No exercises match your filters.</li>
         )}

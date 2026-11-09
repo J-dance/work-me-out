@@ -4,15 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { Timer } from "../utils";
 
 const testWorkout: Workout = {
-  id: 1,
+  id: "1",
   name: 'Test workout',
-  exerciseIds: []
+  steps: []
 }
 
 const testWorkout2: Workout = {
-  id: 2,
+  id: "2",
   name: 'Test workout 2',
-  exerciseIds: []
+  steps: []
 }
 
 const testData = [
@@ -52,7 +52,7 @@ function WorkoutComponent({ workout }: { workout: Workout }) {
 
       <TimerComponent nextIndex={() => {
         if (index === null) return
-        if (index === workout.exerciseIds.length - 2) setIndex(null) // finished
+        if (index === workout.steps.length - 2) setIndex(null) // finished
         else setIndex(index + 1)
       }} />
     </>

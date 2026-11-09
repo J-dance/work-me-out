@@ -63,8 +63,43 @@ export type Exercise = {
   images: string[]
 }
 
+/** An exercise performed for one or more straight sets. */
+export type ExerciseStep = {
+  type: 'exercise'
+  /** Unique per step, so the same exercise can appear more than once */
+  key: string
+  exerciseId: string
+  /** Number of straight sets */
+  sets: number
+  /** Reps per set, null if the set is purely timed */
+  reps: number | null
+  /** Seconds per set, null if the set is purely reps */
+  duration: number | null
+  /** Seconds of rest between each straight set */
+  restBetweenSets: number
+}
+
+/** A break between steps. */
+export type RestStep = {
+  type: 'rest'
+  key: string
+  /** Seconds */
+  duration: number
+}
+
+export type WorkoutStep = ExerciseStep | RestStep
+
+/** Broad body regions a workout targets, each covering one or more muscles. */
+export type BodyArea = 'chest' | 'shoulders' | 'back' | 'arms' | 'core' | 'glutes' | 'legs'
+
 export type Workout = {
-  id: number
+  id: string
   name: string
-  exerciseIds: number[]
+  /** Areas the workout targets, used to filter exercises. Optional so older saved workouts still load. */
+  bodyAreas?: BodyArea[]
+  /** Specific muscles within bodyAreas to narrow the filter further. Empty means every muscle in those areas. */
+  muscles?: Muscle[]
+  /** Equipment the exercises should use. Empty means any. */
+  equipment?: Equipment[]
+  steps: WorkoutStep[]
 }
