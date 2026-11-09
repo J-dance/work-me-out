@@ -1,4 +1,4 @@
-import { use, useEffect, useRef, useState } from "react"
+import { use, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import Layout from "./Layout"
 import type { Screen, Exercise } from '../types'
 import { ExercisesContext } from "../context"
@@ -117,23 +117,125 @@ const ExerciseModal = ({ data, onClose }: { data: Exercise, onClose: () => void 
   )
 }
 
+type Filters = {
+  search: string
+  muscle: string
+  level: string
+  category: string
+  equipment: string
+}
+
+const emptyFilters: Filters = { search: '', muscle: '', level: '', category: '', equipment: '' }
+
+// stable fallback so memoised filters don't recompute every render
+const noExercises: Exercise[] = []
+
+/** Sorted unique values from a list, dropping nulls. */
+const uniqueSorted = <T extends string>(values: (T | null)[]): T[] =>
+  [...new Set(values.filter((v): v is T => v !== null))].sort()
+
+const FilterSelect = ({ label, value, options, onChange }: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) => (
+  <label className="flex flex-col gap-1 text-sm">
+    <span className="opacity-70">{label}</span>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="border-2 border-tertiary bg-bg p-2 capitalize focus:border-primary focus:outline-none"
+    >
+      <option value="">All</option>
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  </label>
+)
+
+/**
+ * Search box plus dropdown filters for the exercise list.
+ */
+const FilterBar = ({ filters, setFilters, options, resultCount }: {
+  filters: Filters
+  setFilters: (filters: Filters) => void
+  options: { muscle: string[], level: string[], category: string[], equipment: string[] }
+  resultCount: number
+}) => {
+  const update = (key: keyof Filters) => (value: string) => setFilters({ ...filters, [key]: value })
+  const isFiltered = Object.values(filters).some(Boolean)
+
+  return (
+    <div className="sticky top-0 z-10 flex w-full flex-col gap-3 bg-bg p-4">
+      <input
+        type="search"
+        placeholder="Search exercises..."
+        value={filters.search}
+        onChange={(e) => update('search')(e.target.value)}
+        className="w-full border-2 border-tertiary bg-bg p-2 focus:border-primary focus:outline-none"
+      />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <FilterSelect label="Primary muscle" value={filters.muscle} options={options.muscle} onChange={update('muscle')} />
+        <FilterSelect label="Level" value={filters.level} options={options.level} onChange={update('level')} />
+        <FilterSelect label="Category" value={filters.category} options={options.category} onChange={update('category')} />
+        <FilterSelect label="Equipment" value={filters.equipment} options={options.equipment} onChange={update('equipment')} />
+      </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="opacity-70">{resultCount} exercise{resultCount === 1 ? '' : 's'}</span>
+        {isFiltered && (
+          <button type="button" onClick={() => setFilters(emptyFilters)} className="underline hover:text-primary">
+            Clear filters
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /**
 * List of exercises to choose from.
 * @returns The exercises screen
 */
 export default function Exercises({ setScreen }: { setScreen: (screen: Screen) => void }) {
   const exercisesPromise = use(ExercisesContext)
-  const exercises = exercisesPromise ? use(exercisesPromise) : []
+  const exercises = exercisesPromise ? use(exercisesPromise) : noExercises
   const [selected, setSelected] = useState<Exercise | null>(null)
+  const [filters, setFilters] = useState<Filters>(emptyFilters)
+  // keeps typing responsive while the (long) list re-filters in the background
+  const deferredFilters = useDeferredValue(filters)
+
+  // dropdown options come from the data itself, so only values that exist are offered
+  const options = useMemo(() => ({
+    muscle: uniqueSorted(exercises.flatMap((e) => e.primaryMuscles)),
+    level: uniqueSorted(exercises.map((e) => e.level)),
+    category: uniqueSorted(exercises.map((e) => e.category)),
+    equipment: uniqueSorted(exercises.map((e) => e.equipment)),
+  }), [exercises])
+
+  const filtered = useMemo(() => {
+    const { search, muscle, level, category, equipment } = deferredFilters
+    const query = search.trim().toLowerCase()
+    return exercises.filter((e) =>
+      (!query || e.name.toLowerCase().includes(query)) &&
+      (!muscle || e.primaryMuscles.includes(muscle as Exercise['primaryMuscles'][number])) &&
+      (!level || e.level === level) &&
+      (!category || e.category === category) &&
+      (!equipment || e.equipment === equipment)
+    )
+  }, [exercises, deferredFilters])
 
   return (
     <Layout setScreen={setScreen} title="Exercises">
+      <FilterBar filters={filters} setFilters={setFilters} options={options} resultCount={filtered.length} />
       <ul className="flex h-full w-full flex-col gap-4 p-4">
-        {exercises.map((data) => (
+        {filtered.map((data) => (
           <li key={data.id}>
             <ExerciseCard data={data} onSelect={() => setSelected(data)} />
           </li>
         ))}
+        {filtered.length === 0 && (
+          <li className="text-center opacity-70">No exercises match your filters.</li>
+        )}
       </ul>
       {selected && <ExerciseModal data={selected} onClose={() => setSelected(null)} />}
     </Layout>
