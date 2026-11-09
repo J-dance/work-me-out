@@ -9,11 +9,20 @@ const ExerciseItem = ({ data }: { data: Exercise }) => {
       <p>{data.description}</p>
       <div className="flex flex-row gap-2 align-middle text-lg">
         {
-          data.muscles.map((name) => (
+          data.primaryMuscles.map((name) => (
             <li key={name}><p>{name}</p></li>
           ))
         }
       </div>
+      {data.secondaryMuscles.length > 0 && (
+        <div className="flex flex-row gap-2 align-middle text-sm opacity-70">
+          {
+            data.secondaryMuscles.map((name) => (
+              <li key={name}><p>{name}</p></li>
+            ))
+          }
+        </div>
+      )}
     </div>
   )
 }

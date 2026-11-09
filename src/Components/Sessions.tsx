@@ -33,14 +33,32 @@ export default function Session({ setScreen }: { setScreen: (screen: Screen) => 
       <section>
         {
           workout ?
-            <TimerComponent workout={workout} /> : <SelectWorkout setWorkout={setWorkout} />
+            <WorkoutComponent workout={workout} /> : <SelectWorkout setWorkout={setWorkout} />
         }
       </section>
     }</Layout>
   )
 }
 
-function TimerComponent({ workout }: { workout: Workout }) {
+function WorkoutComponent({ workout }: { workout: Workout }) {
+  const [index, setIndex] = useState<number>(0)
+
+  return (
+    <>
+      <h2 className="text-3xl">{workout.name}</h2>
+      {
+        index != null ? index : 'No current exercise'
+      }
+
+      <TimerComponent nextIndex={() => {
+        if (index === workout.exerciseIds.length - 2) setIndex(null) // finished
+        else setIndex(index + 1)
+      }} />
+    </>
+  )
+}
+
+function TimerComponent({ nextIndex }: { nextIndex: () => void }) {
   const [time, setTime] = useState<number>(0) // time in seconds
   const [isRunning, setIsRunning] = useState<boolean>(false)
 
@@ -55,7 +73,6 @@ function TimerComponent({ workout }: { workout: Workout }) {
   const TimerCtr = useRef<Timer>(new Timer(updateTimer, finishTimer, 10))
   return (
     <>
-      <h2 className="text-3xl">{workout.name}</h2>
       <div>
         <p className="text-lg">{isRunning ? time : 'Press start'}</p>
         {
