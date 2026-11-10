@@ -226,3 +226,37 @@ export const playBeep = () => {
     osc.stop(t + 0.2)
   }
 }
+
+/**
+ * Keeps the screen on while `active` is true, so the phone doesn't lock (and pause the timer) mid-workout.
+ * The browser drops the lock whenever the page is hidden, so it's requested again when the page comes back.
+ * Does nothing where the Screen Wake Lock API isn't supported.
+ */
+export const useWakeLock = (active: boolean) => {
+  useEffect(() => {
+    if (!active || !('wakeLock' in navigator)) return
+
+    let lock: WakeLockSentinel | null = null
+    let cancelled = false
+
+    const request = async () => {
+      if (document.visibilityState !== 'visible' || (lock && !lock.released)) return
+      try {
+        const next = await navigator.wakeLock.request('screen')
+        if (cancelled) void next.release()
+        else lock = next
+      } catch (e) {
+        // e.g. low battery mode, or the page isn't visible
+        console.warn('Could not keep the screen on', e)
+      }
+    }
+
+    void request()
+    document.addEventListener('visibilitychange', request)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', request)
+      void lock?.release()
+    }
+  }, [active])
+}

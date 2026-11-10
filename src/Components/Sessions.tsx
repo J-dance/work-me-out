@@ -1,7 +1,7 @@
 import Layout from "./Layout";
 import type { Exercise, Screen, Workout } from "../types";
 import { use, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
-import { formatDuration, loadWorkouts, playBeep, speakDuration, Timer, unlockAudio, useFocusOnChange } from "../utils";
+import { formatDuration, loadWorkouts, playBeep, speakDuration, Timer, unlockAudio, useFocusOnChange, useWakeLock } from "../utils";
 import { ExercisesContext } from "../context";
 import ExerciseImage from "./ExerciseImage";
 
@@ -109,6 +109,8 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
 
   const timerRef = useRef<Timer | null>(null)
   const headingRef = useFocusOnChange<HTMLHeadingElement>()
+  // keep the screen on while the workout is running, so the phone locking doesn't pause the timer
+  useWakeLock(status === 'running')
 
   /**
    * Moves to a phase and loads its time into the timer.
