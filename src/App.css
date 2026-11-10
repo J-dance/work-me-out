@@ -10,3 +10,10 @@
   --color-outline: #7a6aad;
   --color-white: #e8e9f3;
 }
+
+/* the app is dark-only: tell the browser so native controls (select popups, scrollbars,
+   search clear button, autofill) are drawn dark instead of light in every engine */
+:root {
+  color-scheme: dark;
+  background-color: var(--color-bg);
+}
