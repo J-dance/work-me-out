@@ -44,18 +44,25 @@ export class Timer {
    * Handles timer finish
    */
   public updateTimer() {
-    const remaining = Math.max(
-      0,
-      this.endTime - Date.now()
-    );
+    try {
+      const remaining = Math.max(
+        0,
+        this.endTime - Date.now()
+      );
 
-    const seconds = Math.ceil(remaining / 1000);
+      const seconds = Math.ceil(remaining / 1000);
 
-    this.onUpdate(seconds)
+      this.onUpdate(seconds)
 
-    if (remaining <= 0) {
+      if (remaining <= 0) {
+        this.stopTimer()
+        this.onFinsih()
+      }
+    } catch (e) {
+      // errors in a setInterval callback don't stop the interval and aren't seen by
+      // React error boundaries, so stop here instead of throwing every 100ms
       this.stopTimer()
-      this.onFinsih()
+      console.error("Timer stopped after an error", e)
     }
   }
 

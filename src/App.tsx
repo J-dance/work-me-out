@@ -7,6 +7,7 @@ import Workouts from './Components/Workouts'
 import Session from './Components/Sessions'
 import { UserContext } from './context'
 import ExerciseProvider from './Components/ExerciseProvider'
+import ScreenErrorBoundary from './Components/ScreenErrorBoundary'
 
 function App() {
   const [screen, setScreen] = useState<Screen>('menu')
@@ -19,10 +20,16 @@ function App() {
         setState: setUserData
       }}>
         <ExerciseProvider>
-          {screen === 'menu' && <Menu setScreen={setScreen} />}
-          {screen === 'exercises' && <Exercises setScreen={setScreen} />}
-          {screen === 'workouts' && <Workouts setScreen={setScreen} />}
-          {screen === 'session' && <Session setScreen={setScreen} />}
+          {/* keyed by screen: each screen gets its own boundary, and switching screens clears any error */}
+          <ScreenErrorBoundary
+            key={screen}
+            onBackToMenu={screen === 'menu' ? undefined : () => setScreen('menu')}
+          >
+            {screen === 'menu' && <Menu setScreen={setScreen} />}
+            {screen === 'exercises' && <Exercises setScreen={setScreen} />}
+            {screen === 'workouts' && <Workouts setScreen={setScreen} />}
+            {screen === 'session' && <Session setScreen={setScreen} />}
+          </ScreenErrorBoundary>
         </ExerciseProvider>
       </UserContext>
     </main>
