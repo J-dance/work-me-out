@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useId, useRef } from "react"
 import type { Exercise } from '../types'
 import { imgBase } from "./ExerciseProvider"
 import { lockScroll } from "../utils"
 
 const Tag = ({ children }: { children: React.ReactNode }) => (
-  <span className="rounded-full bg-tertiary px-3 py-1 text-sm capitalize">{children}</span>
+  <li className="rounded-full bg-tertiary px-3 py-1 text-sm capitalize">{children}</li>
 )
 
 /**
@@ -18,6 +18,7 @@ export default function ExerciseModal({ data, onClose, action }: {
   action?: { label: string, onClick: () => void }
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -36,29 +37,31 @@ export default function ExerciseModal({ data, onClose, action }: {
   return (
     <dialog
       ref={dialogRef}
+      aria-labelledby={titleId}
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-bg text-white backdrop:bg-black/60"
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
         <header className="flex items-start justify-between gap-4">
-          <h2 className="text-3xl">{data.name}</h2>
+          <h2 id={titleId} className="text-3xl">{data.name}</h2>
           <button
             type="button"
             onClick={() => dialogRef.current?.close()}
-            aria-label="Close"
-            className="shrink-0 border-2 border-tertiary px-3 py-1 text-xl hover:border-primary"
+            aria-label="Close details"
+            className="shrink-0 border-2 border-outline px-3 py-1 text-xl hover:border-primary"
           >
             ✕
           </button>
         </header>
 
         {data.images.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto">
-            {data.images.map((src) => (
+          // focusable so keyboard users can scroll the strip sideways
+          <div className="flex gap-2 overflow-x-auto" role="region" aria-label="Images" tabIndex={0}>
+            {data.images.map((src, i) => (
               <img
                 key={src}
                 src={imgBase + src}
-                alt={data.name}
+                alt={`${data.name} demonstration, ${i + 1} of ${data.images.length}`}
                 loading="lazy"
                 className="w-full max-w-sm shrink-0 object-cover"
               />
@@ -77,13 +80,14 @@ export default function ExerciseModal({ data, onClose, action }: {
 
         <section className="flex flex-col gap-2">
           <h3 className="text-xl">Muscles</h3>
-          <div className="flex flex-wrap gap-2">
+          {/* primary vs secondary was only shown by opacity, so label the lists for screen readers */}
+          <ul aria-label="Primary muscles" className="flex flex-wrap gap-2">
             {data.primaryMuscles.map((m) => <Tag key={m}>{m}</Tag>)}
-          </div>
+          </ul>
           {data.secondaryMuscles.length > 0 && (
-            <div className="flex flex-wrap gap-2 opacity-70">
+            <ul aria-label="Secondary muscles" className="flex flex-wrap gap-2 opacity-70">
               {data.secondaryMuscles.map((m) => <Tag key={m}>{m}</Tag>)}
-            </div>
+            </ul>
           )}
         </section>
 
@@ -98,7 +102,7 @@ export default function ExerciseModal({ data, onClose, action }: {
       </div>
 
       {action && (
-        <div className="sticky bottom-0 border-t-2 border-tertiary bg-bg p-4">
+        <div className="sticky bottom-0 border-t-2 border-outline bg-bg p-4">
           <div className="mx-auto max-w-2xl">
             <button
               type="button"
@@ -106,7 +110,7 @@ export default function ExerciseModal({ data, onClose, action }: {
                 action.onClick()
                 dialogRef.current?.close()
               }}
-              className="w-full border-2 border-primary bg-primary p-3"
+              className="w-full border-2 border-primary bg-primary p-3 text-bg"
             >
               {action.label}
             </button>

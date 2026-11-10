@@ -1,5 +1,6 @@
 import { MenuButton } from './Buttons'
 import type { Screen } from '../types'
+import { useFocusOnChange } from '../utils'
 
 /**
  * Main navigation menu.
@@ -7,15 +8,20 @@ import type { Screen } from '../types'
  * @returns 
  */
 const Menu = ({ setScreen }: { setScreen: (screen: Screen) => void }) => {
+  // focus the heading when coming back from another screen, so the change is announced
+  const headingRef = useFocusOnChange<HTMLHeadingElement>()
   return (
-    <>
-      <h1 className='text-5xl'>WorkMeOut</h1>
-      <menu className="flex flex-col items-center justify-center gap-4">
-        <MenuButton onClick={() => { setScreen('exercises') }} text="Exercises" />
-        <MenuButton onClick={() => { setScreen('workouts') }} text="Workouts" />
-        <MenuButton onClick={() => { setScreen('session') }} text="Lets Go!" />
-      </menu >
-    </>
+    <main className="flex flex-col items-center gap-4">
+      <title>WorkMeOut</title>
+      <h1 ref={headingRef} tabIndex={-1} className='text-5xl focus:outline-none'>WorkMeOut</h1>
+      <nav aria-label="Main">
+        <ul className="flex flex-col items-center justify-center gap-4">
+          <li><MenuButton onClick={() => { setScreen('exercises') }} text="Exercises" /></li>
+          <li><MenuButton onClick={() => { setScreen('workouts') }} text="Workouts" /></li>
+          <li><MenuButton onClick={() => { setScreen('session') }} text="Lets Go!" /></li>
+        </ul>
+      </nav>
+    </main>
   )
 }
 

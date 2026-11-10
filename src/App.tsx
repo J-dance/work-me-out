@@ -14,7 +14,7 @@ function App() {
   const [userData, setUserData] = useState<unknown>(null)
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-dvh w-full gap-4 bg-bg text-white">
+    <div className="flex flex-col items-center justify-center min-h-dvh w-full gap-4 bg-bg text-white">
       <UserContext value={{
         state: userData,
         setState: setUserData
@@ -32,7 +32,7 @@ function App() {
           </ScreenErrorBoundary>
         </ExerciseProvider>
       </UserContext>
-    </main>
+    </div>
   )
 }
 

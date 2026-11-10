@@ -45,9 +45,9 @@ exercisesPromise.catch(() => {})
 
 function Spinner() {
   return (
-    <div>
-      Loading...
-    </div>
+    <main>
+      <p role="status">Loading exercises…</p>
+    </main>
   )
 }
 

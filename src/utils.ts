@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react"
 import type { Workout } from "./types"
 
 
@@ -114,4 +115,28 @@ export const lockScroll = (): (() => void) => {
   return () => {
     if (--scrollLocks === 0) document.body.style.overflow = ''
   }
+}
+
+/** Seconds in words for screen readers, e.g. 90 -> "1 minute 30 seconds". */
+export const speakDuration = (seconds: number): string => {
+  const m = Math.floor(seconds / 60)
+  const s = Math.round(seconds % 60)
+  const parts = [
+    m > 0 && `${m} minute${m === 1 ? '' : 's'}`,
+    (s > 0 || m === 0) && `${s} second${s === 1 ? '' : 's'}`,
+  ].filter(Boolean)
+  return parts.join(' ')
+}
+
+/**
+ * Focuses the returned element on mount and whenever `key` changes.
+ * Used on headings (with tabIndex={-1}) so screen readers announce a new screen or view
+ * instead of losing focus when the button that was pressed disappears.
+ */
+export const useFocusOnChange = <T extends HTMLElement>(key?: unknown) => {
+  const ref = useRef<T>(null)
+  useEffect(() => {
+    ref.current?.focus()
+  }, [key])
+  return ref
 }

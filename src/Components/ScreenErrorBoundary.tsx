@@ -36,8 +36,8 @@ export default class ScreenErrorBoundary extends Component<Props, State> {
     const loadFailed = error instanceof ExercisesLoadError
 
     return (
-      <div role="alert" className="flex flex-col items-center gap-4 p-6 text-center">
-        <h2 className="text-2xl">{loadFailed ? "Couldn't load exercises" : "Something went wrong"}</h2>
+      <main role="alert" className="flex flex-col items-center gap-4 p-6 text-center">
+        <h1 className="text-2xl">{loadFailed ? "Couldn't load exercises" : "Something went wrong"}</h1>
         <p className="opacity-70">
           {loadFailed
             ? "Check your internet connection and try again."
@@ -48,7 +48,7 @@ export default class ScreenErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={this.props.onBackToMenu}
-              className="border-2 border-tertiary px-4 py-2 hover:border-primary"
+              className="border-2 border-outline px-4 py-2 hover:border-primary"
             >
               Back to menu
             </button>
@@ -57,12 +57,12 @@ export default class ScreenErrorBoundary extends Component<Props, State> {
             type="button"
             // the exercise fetch runs once at module load, so a reload is what retries it
             onClick={() => window.location.reload()}
-            className="border-2 border-tertiary px-4 py-2 hover:border-primary"
+            className="border-2 border-outline px-4 py-2 hover:border-primary"
           >
             {loadFailed ? "Try again" : "Reload"}
           </button>
         </div>
-      </div>
+      </main>
     )
   }
 }

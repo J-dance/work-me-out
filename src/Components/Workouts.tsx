@@ -1,8 +1,8 @@
-import { use, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
+import { use, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react"
 import Layout from "./Layout"
 import type { Screen, Exercise, Workout, WorkoutStep, ExerciseStep, RestStep, BodyArea, Muscle, Equipment } from '../types'
 import { ExercisesContext } from "../context"
-import { formatDuration, loadWorkouts, lockScroll, saveWorkouts, uid } from "../utils"
+import { formatDuration, loadWorkouts, lockScroll, saveWorkouts, speakDuration, uid } from "../utils"
 import ExerciseModal from "./ExerciseModal"
 
 // stable fallback so memoised values don't recompute every render
@@ -85,7 +85,7 @@ const describeFocus = ({ equipment, areas, muscles }: Focus): string => {
 }
 
 const chipClass = (selected: boolean) =>
-  `rounded-full border-2 px-3 py-1 text-sm capitalize ${selected ? 'border-primary bg-tertiary' : 'border-tertiary hover:border-primary'}`
+  `rounded-full border-2 px-3 py-1 text-sm capitalize ${selected ? 'border-primary bg-tertiary' : 'border-outline hover:border-primary'}`
 
 /**
  * Toggleable chips for picking equipment and body areas, then optionally specific muscles within those areas.
@@ -110,6 +110,8 @@ const FocusSelect = ({ value, onChange }: { value: Focus, onChange: React.Dispat
     muscles: prev.muscles.includes(muscle) ? prev.muscles.filter((m) => m !== muscle) : [...prev.muscles, muscle],
   }))
 
+  const id = useId()
+
   // keep the area order fixed rather than the order they were tapped
   const muscleOptions = bodyAreaNames
     .filter((a) => value.areas.includes(a) && BODY_AREAS[a].length > 1)
@@ -117,16 +119,16 @@ const FocusSelect = ({ value, onChange }: { value: Focus, onChange: React.Dispat
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm opacity-70">Equipment</span>
-      <div className="flex flex-wrap gap-2">
+      <span id={`${id}-equipment`} className="text-sm opacity-70">Equipment</span>
+      <div role="group" aria-labelledby={`${id}-equipment`} className="flex flex-wrap gap-2">
         {EQUIPMENT.map((item) => (
           <button key={item} type="button" aria-pressed={value.equipment.includes(item)} onClick={() => toggleEquipment(item)} className={chipClass(value.equipment.includes(item))}>
             {item}
           </button>
         ))}
       </div>
-      <span className="mt-1 text-sm opacity-70">Body areas</span>
-      <div className="flex flex-wrap gap-2">
+      <span id={`${id}-areas`} className="mt-1 text-sm opacity-70">Body areas</span>
+      <div role="group" aria-labelledby={`${id}-areas`} className="flex flex-wrap gap-2">
         {bodyAreaNames.map((area) => (
           <button key={area} type="button" aria-pressed={value.areas.includes(area)} onClick={() => toggleArea(area)} className={chipClass(value.areas.includes(area))}>
             {area}
@@ -134,8 +136,8 @@ const FocusSelect = ({ value, onChange }: { value: Focus, onChange: React.Dispat
         ))}
       </div>
       {muscleOptions.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-l-2 border-tertiary pl-3">
-          <span className="text-sm opacity-70">Muscles:</span>
+        <div role="group" aria-labelledby={`${id}-muscles`} className="flex flex-wrap items-center gap-2 border-l-2 border-outline pl-3">
+          <span id={`${id}-muscles`} className="text-sm opacity-70">Muscles:</span>
           {muscleOptions.map((muscle) => (
             <button key={muscle} type="button" aria-pressed={value.muscles.includes(muscle)} onClick={() => toggleMuscle(muscle)} className={chipClass(value.muscles.includes(muscle))}>
               {muscle}
@@ -205,8 +207,11 @@ const NumberField = ({ label, value, onChange, min = 0, max, optional = false, s
 
   return (
     <label className="flex min-w-0 flex-col gap-1 text-sm">
-      <span className="opacity-70">{label}</span>
-      <span className="flex items-center border-2 border-tertiary focus-within:border-primary">
+      <span className="opacity-70">
+        {label}
+        {suffix && <span className="sr-only"> ({suffix === 's' ? 'seconds' : suffix})</span>}
+      </span>
+      <span className="flex items-center border-2 border-outline focus-within:border-primary">
         <input
           type="number"
           inputMode="numeric"
@@ -218,7 +223,7 @@ const NumberField = ({ label, value, onChange, min = 0, max, optional = false, s
           onBlur={() => setText(value?.toString() ?? '')}
           className="w-full min-w-0 bg-bg p-2 focus:outline-none"
         />
-        {suffix && <span className="pr-2 opacity-70">{suffix}</span>}
+        {suffix && <span aria-hidden="true" className="pr-2 opacity-70">{suffix}</span>}
       </span>
     </label>
   )
@@ -239,11 +244,13 @@ type HandleProps = {
 const DragHandle = ({ handleProps, label }: { handleProps: HandleProps, label: string }) => (
   <button
     type="button"
-    aria-label={`Reorder ${label}. Use arrow keys to move.`}
+    aria-label={`Reorder ${label}`}
+    aria-description="Use the up and down arrow keys to move"
+    data-drag-handle
     className="flex shrink-0 cursor-grab touch-none items-center self-stretch px-2 text-xl opacity-60 hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
     {...handleProps}
   >
-    ⠿
+    <span aria-hidden="true">⠿</span>
   </button>
 )
 
@@ -254,9 +261,9 @@ const InfoButton = ({ onClick, label, className = '' }: { onClick: () => void, l
     onClick={onClick}
     aria-label={`Details for ${label}`}
     title="Exercise details"
-    className={`shrink-0 hover:text-primary focus-visible:text-primary focus-visible:outline-none ${className}`}
+    className={`shrink-0 hover:text-primary focus-visible:text-primary ${className}`}
   >
-    ⓘ
+    <span aria-hidden="true">ⓘ</span>
   </button>
 )
 
@@ -265,9 +272,9 @@ const RemoveButton = ({ onClick, label }: { onClick: () => void, label: string }
     type="button"
     onClick={onClick}
     aria-label={`Remove ${label}`}
-    className="shrink-0 self-start border-2 border-tertiary px-2 hover:border-primary"
+    className="shrink-0 self-start border-2 border-outline px-2 hover:border-primary"
   >
-    ✕
+    <span aria-hidden="true">✕</span>
   </button>
 )
 
@@ -284,7 +291,7 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
   const update = <K extends keyof ExerciseStep>(key: K) => (value: ExerciseStep[K]) => onChange({ ...step, [key]: value })
 
   return (
-    <div className="flex gap-2 border-2 border-tertiary bg-bg p-3">
+    <div className="flex gap-2 border-2 border-outline bg-bg p-3">
       <DragHandle handleProps={handleProps} label={name} />
       <div className="flex min-w-0 grow flex-col gap-3">
         <header className="flex items-start justify-between gap-2">
@@ -293,7 +300,7 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
             <p className="text-sm opacity-70">{describeSets(step)}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {exercise && <InfoButton onClick={onInfo} label={name} className="border-2 border-tertiary px-2 hover:border-primary" />}
+            {exercise && <InfoButton onClick={onInfo} label={name} className="border-2 border-outline px-2 hover:border-primary" />}
             <RemoveButton onClick={onRemove} label={name} />
           </div>
         </header>
@@ -311,10 +318,11 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
         )}
 
         <div className="flex items-center justify-between gap-2 text-sm">
-          {isStepValid(step)
-            ? <span />
-            : <span className="text-primary">Set reps and/or time</span>}
-          <button type="button" onClick={onAddRestAfter} className="underline hover:text-primary">
+          {/* always rendered so screen readers pick up the message when it appears */}
+          <span role="status" className="text-primary">
+            {!isStepValid(step) && `${name}: set reps and/or time`}
+          </span>
+          <button type="button" onClick={onAddRestAfter} aria-label={`Add rest after ${name}`} className="underline hover:text-primary">
             + Rest after
           </button>
         </div>
@@ -323,19 +331,23 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
   )
 }
 
-const RestStepCard = ({ step, onChange, onRemove, handleProps }: {
+const RestStepCard = ({ step, label, onChange, onRemove, handleProps }: {
   step: RestStep
+  label: string
   onChange: (step: RestStep) => void
   onRemove: () => void
   handleProps: HandleProps
 }) => (
   <div className="flex items-center gap-2 border-2 border-dashed border-secondary bg-bg p-3">
-    <DragHandle handleProps={handleProps} label="rest" />
-    <span className="grow">Rest · {formatDuration(step.duration)}</span>
+    <DragHandle handleProps={handleProps} label={label} />
+    <h3 className="grow">
+      <span aria-hidden="true">Rest · {formatDuration(step.duration)}</span>
+      <span className="sr-only">Rest, {speakDuration(step.duration)}</span>
+    </h3>
     <div className="w-28">
       <NumberField label="Duration" value={step.duration} min={1} suffix="s" onChange={(v) => v !== null && onChange({ ...step, duration: v })} />
     </div>
-    <RemoveButton onClick={onRemove} label="rest" />
+    <RemoveButton onClick={onRemove} label={label} />
   </div>
 )
 
@@ -357,9 +369,28 @@ const StepList = ({ steps, setSteps, exercisesById }: {
   const dragMeasure = useRef<{ startY: number, mids: number[] } | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [info, setInfo] = useState<Exercise | null>(null)
+  // read out by the live region after a keyboard move or a removal
+  const [announcement, setAnnouncement] = useState('')
+  // step whose drag handle should get focus back after React reorders the list
+  const refocusKey = useRef<string | null>(null)
 
-  const move = (from: number, to: number) => {
+  useEffect(() => {
+    const key = refocusKey.current
+    if (!key) return
+    refocusKey.current = null
+    itemRefs.current.get(key)?.querySelector<HTMLElement>('[data-drag-handle]')?.focus()
+  }, [steps])
+
+  const stepLabel = (step: WorkoutStep, index: number): string => step.type === 'exercise'
+    ? exercisesById.get(step.exerciseId)?.name ?? 'Unknown exercise'
+    : `rest ${steps.slice(0, index + 1).filter((s) => s.type === 'rest').length}`
+
+  const move = (from: number, to: number, announce = false) => {
     if (to < 0 || to >= steps.length || from === to) return
+    if (announce) {
+      refocusKey.current = steps[from].key
+      setAnnouncement(`${stepLabel(steps[from], from)} moved to position ${to + 1} of ${steps.length}`)
+    }
     setSteps((prev) => {
       const next = [...prev]
       const [item] = next.splice(from, 1)
@@ -371,8 +402,10 @@ const StepList = ({ steps, setSteps, exercisesById }: {
   const updateStep = (index: number, step: WorkoutStep) =>
     setSteps((prev) => prev.map((s, i) => (i === index ? step : s)))
 
-  const removeStep = (index: number) =>
+  const removeStep = (index: number) => {
+    setAnnouncement(`Removed ${stepLabel(steps[index], index)}`)
     setSteps((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const insertRest = (index: number) =>
     setSteps((prev) => [...prev.slice(0, index), newRestStep(), ...prev.slice(index)])
@@ -407,8 +440,8 @@ const StepList = ({ steps, setSteps, exercisesById }: {
       setDrag(null)
     },
     onKeyDown: (e) => {
-      if (e.key === 'ArrowUp') { e.preventDefault(); move(index, index - 1) }
-      if (e.key === 'ArrowDown') { e.preventDefault(); move(index, index + 1) }
+      if (e.key === 'ArrowUp') { e.preventDefault(); move(index, index - 1, true) }
+      if (e.key === 'ArrowDown') { e.preventDefault(); move(index, index + 1, true) }
     },
   })
 
@@ -422,13 +455,21 @@ const StepList = ({ steps, setSteps, exercisesById }: {
     return 0
   }
 
+  const liveRegion = <p role="status" className="sr-only">{announcement}</p>
+
   if (steps.length === 0) {
-    return <p className="py-8 text-center opacity-70">No exercises yet. Add one below.</p>
+    return (
+      <>
+        {liveRegion}
+        <p className="py-8 text-center opacity-70">No exercises yet. Add one below.</p>
+      </>
+    )
   }
 
   return (
     <>
-      <ol className="flex flex-col gap-3">
+      {liveRegion}
+      <ol className="flex flex-col gap-3" aria-label="Workout steps">
         {steps.map((step, index) => {
           const isDragged = drag?.from === index
           return (
@@ -458,6 +499,7 @@ const StepList = ({ steps, setSteps, exercisesById }: {
               ) : (
                 <RestStepCard
                   step={step}
+                  label={stepLabel(step, index)}
                   onChange={(s) => updateStep(index, s)}
                   onRemove={() => removeStep(index)}
                   handleProps={handlePropsFor(index)}
@@ -484,6 +526,7 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const titleId = useId()
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
   const [info, setInfo] = useState<Exercise | null>(null)
@@ -504,43 +547,49 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
   return (
     <dialog
       ref={dialogRef}
+      aria-labelledby={titleId}
       // React passes the details modal's close event up to here, so ignore it unless this dialog closed
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-bg text-white backdrop:bg-black/60"
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
         <header className="flex items-center justify-between gap-4">
-          <h2 className="text-3xl">Add exercise</h2>
+          <h2 id={titleId} className="text-3xl">Add exercise</h2>
           <button
             type="button"
             onClick={() => dialogRef.current?.close()}
-            aria-label="Close"
-            className="shrink-0 border-2 border-tertiary px-3 py-1 text-xl hover:border-primary"
+            aria-label="Close exercise picker"
+            className="shrink-0 border-2 border-outline px-3 py-1 text-xl hover:border-primary"
           >
-            ✕
+            <span aria-hidden="true">✕</span>
           </button>
         </header>
         <input
           ref={searchRef}
           type="search"
+          aria-label="Search exercises"
           placeholder="Search exercises..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full border-2 border-tertiary bg-bg p-2 focus:border-primary focus:outline-none"
+          className="w-full border-2 border-outline bg-bg p-2 focus:border-primary focus:outline-none"
         />
         <FocusSelect value={focus} onChange={setFocus} />
-        <ul className="flex flex-col gap-2">
+        <p role="status" className="sr-only">{matches.length} exercise{matches.length === 1 ? '' : 's'} found</p>
+        <ul className="flex flex-col gap-2" aria-label="Exercises">
           {matches.slice(0, PICKER_LIMIT).map((exercise) => (
-            <li key={exercise.id} className="flex border-2 border-tertiary has-[button:hover]:border-primary has-[button:focus-visible]:border-primary">
+            <li key={exercise.id} className="flex border-2 border-outline has-[button:hover]:border-primary has-[button:focus-visible]:border-primary">
               <button
                 type="button"
                 onClick={() => onPick(exercise)}
                 className="flex min-w-0 grow flex-col p-3 text-left focus-visible:outline-none"
               >
                 <span>{exercise.name}</span>
-                <span className="text-sm capitalize opacity-70">{exercise.primaryMuscles.join(', ')}</span>
+                <span className="text-sm capitalize opacity-70">
+                  <span className="sr-only">, works </span>
+                  {exercise.primaryMuscles.join(', ')}
+                </span>
               </button>
-              <InfoButton onClick={() => setInfo(exercise)} label={exercise.name} className="border-l-2 border-tertiary px-4 text-xl" />
+              <InfoButton onClick={() => setInfo(exercise)} label={exercise.name} className="border-l-2 border-outline px-4 text-xl" />
             </li>
           ))}
           {matches.length === 0 && <li className="text-center opacity-70">No exercises found.</li>}
@@ -590,17 +639,19 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
     <section className="flex w-full max-w-2xl grow flex-col gap-4">
       <input
         type="text"
+        aria-label="Workout name"
         placeholder="Workout name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full border-2 border-tertiary bg-bg p-2 text-xl focus:border-primary focus:outline-none"
+        className="w-full border-2 border-outline bg-bg p-2 text-xl focus:border-primary focus:outline-none"
       />
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-lg">Filter exercises <span className="text-sm opacity-70">(what you have and what to work)</span></h3>
+        <h2 className="text-lg">Filter exercises <span className="text-sm opacity-70">(what you have and what to work)</span></h2>
         <FocusSelect value={focus} onChange={setFocus} />
       </div>
 
+      <h2 className="sr-only">Steps</h2>
       <p className="text-sm opacity-70">
         {exerciseSteps.length} exercise{exerciseSteps.length === 1 ? '' : 's'} · {totalSets} set{totalSets === 1 ? '' : 's'} · ~{formatDuration(estimateSeconds(steps))}
       </p>
@@ -611,7 +662,8 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
         <button
           type="button"
           onClick={() => setPicking(true)}
-          className="border-2 border-tertiary p-3 hover:bg-tertiary"
+          aria-label="Add exercise"
+          className="border-2 border-outline p-3 hover:bg-tertiary"
         >
           + Exercise
         </button>
@@ -619,7 +671,8 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
           type="button"
           onClick={() => setSteps((prev) => [...prev, newRestStep()])}
           disabled={steps.length === 0}
-          className="border-2 border-dashed border-secondary p-3 hover:bg-secondary disabled:opacity-40 disabled:hover:bg-transparent"
+          aria-label="Add rest"
+          className="border-2 border-dashed border-secondary p-3 hover:bg-secondary/50 disabled:opacity-40 disabled:hover:bg-transparent"
         >
           + Rest
         </button>
@@ -631,11 +684,11 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
             type="button"
             onClick={save}
             disabled={!canSave}
-            className="border-2 border-primary bg-primary px-4 py-2 disabled:opacity-40"
+            className="border-2 border-primary bg-primary px-4 py-2 text-bg disabled:opacity-40"
           >
             Save
           </button>
-          <button type="button" onClick={onCancel} className="border-2 border-tertiary px-4 py-2 hover:border-primary">
+          <button type="button" onClick={onCancel} className="border-2 border-outline px-4 py-2 hover:border-primary">
             Cancel
           </button>
         </div>
@@ -708,20 +761,24 @@ export default function Workouts({ setScreen }: { setScreen: (screen: Screen) =>
             {workouts.map((workout) => {
               const count = workout.steps.filter((s) => s.type === 'exercise').length
               return (
-                <li key={workout.id}>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(workout)}
-                    className="flex w-full flex-col gap-1 border-2 border-tertiary p-4 text-left hover:border-primary focus-visible:border-primary focus-visible:outline-none"
-                  >
-                    <h3 className="text-xl">{workout.name}</h3>
-                    <p className="text-sm opacity-70">
-                      {count} exercise{count === 1 ? '' : 's'} · ~{formatDuration(estimateSeconds(workout.steps))}
-                    </p>
-                    {describeFocus(focusFromWorkout(workout)) && (
-                      <p className="text-sm capitalize">{describeFocus(focusFromWorkout(workout))}</p>
-                    )}
-                  </button>
+                <li key={workout.id} className="relative flex w-full flex-col gap-1 border-2 border-outline p-4 hover:border-primary has-[button:focus-visible]:border-primary">
+                  <h2 className="text-xl">
+                    {/* ::after stretches the click target over the whole card */}
+                    <button
+                      type="button"
+                      onClick={() => setEditing(workout)}
+                      aria-label={`Edit ${workout.name}`}
+                      className="text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+                    >
+                      {workout.name}
+                    </button>
+                  </h2>
+                  <p className="text-sm opacity-70">
+                    {count} exercise{count === 1 ? '' : 's'} · ~{formatDuration(estimateSeconds(workout.steps))}
+                  </p>
+                  {describeFocus(focusFromWorkout(workout)) && (
+                    <p className="text-sm capitalize">{describeFocus(focusFromWorkout(workout))}</p>
+                  )}
                 </li>
               )
             })}
@@ -730,7 +787,7 @@ export default function Workouts({ setScreen }: { setScreen: (screen: Screen) =>
           <button
             type="button"
             aria-label="New workout"
-            className="p-8 rounded-full border-solid border-8 border-tertiary text-5xl aspect-square hover:bg-tertiary hover:cursor-pointer"
+            className="p-8 rounded-full border-solid border-8 border-outline text-5xl aspect-square hover:bg-tertiary hover:cursor-pointer"
             onClick={() => setEditing(newWorkout())}
           >
             +

@@ -9,18 +9,26 @@ import ExerciseModal from "./ExerciseModal"
  */
 const ExerciseCard = ({ data, onSelect }: { data: Exercise, onSelect: () => void }) => {
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="flex w-full flex-col gap-2 border-2 border-tertiary p-4 text-left transition-colors hover:border-primary focus-visible:border-primary focus-visible:outline-none"
-    >
-      <h3 className="text-xl">{data.name}</h3>
+    <article className="relative flex w-full flex-col gap-2 border-2 border-outline p-4 transition-colors motion-reduce:transition-none hover:border-primary has-[button:focus-visible]:border-primary">
+      <h2 className="text-xl">
+        {/* the ::after overlay makes the whole card clickable while only the name is the button's label */}
+        <button
+          type="button"
+          onClick={onSelect}
+          className="text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
+        >
+          {data.name}
+        </button>
+      </h2>
       <p className="text-sm capitalize opacity-70">
         {data.level} · {data.category}
         {data.equipment && ` · ${data.equipment}`}
       </p>
-      <p className="text-sm capitalize">{data.primaryMuscles.join(', ')}</p>
-    </button>
+      <p className="text-sm capitalize">
+        <span className="sr-only">Primary muscles: </span>
+        {data.primaryMuscles.join(', ')}
+      </p>
+    </article>
   )
 }
 
@@ -55,7 +63,7 @@ const FilterSelect = ({ label, value, options, onChange }: {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="border-2 border-tertiary bg-bg p-2 capitalize focus:border-primary focus:outline-none"
+      className="border-2 border-outline bg-bg p-2 capitalize focus:border-primary focus:outline-none"
     >
       <option value="">All</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -77,13 +85,14 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
   const isFiltered = Object.values(filters).some(Boolean)
 
   return (
-    <div className="sticky top-0 z-10 flex w-full flex-col gap-3 bg-bg p-4">
+    <search className="sticky top-0 z-10 flex w-full flex-col gap-3 bg-bg p-4" aria-label="Filter exercises">
       <input
         type="search"
+        aria-label="Search exercises"
         placeholder="Search exercises..."
         value={filters.search}
         onChange={(e) => update('search')(e.target.value)}
-        className="w-full border-2 border-tertiary bg-bg p-2 focus:border-primary focus:outline-none"
+        className="w-full border-2 border-outline bg-bg p-2 focus:border-primary focus:outline-none"
       />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <FilterSelect label="Primary muscle" value={filters.muscle} options={options.muscle} onChange={update('muscle')} />
@@ -92,7 +101,7 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
         <FilterSelect label="Equipment" value={filters.equipment} options={options.equipment} onChange={update('equipment')} />
       </div>
       <div className="flex items-center justify-between text-sm">
-        <span className="opacity-70">
+        <span className="opacity-70" aria-hidden="true">
           {shownCount < resultCount && `Showing ${shownCount} of `}
           {resultCount} exercise{resultCount === 1 ? '' : 's'}
         </span>
@@ -102,7 +111,11 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
           </button>
         )}
       </div>
-    </div>
+      {/* announce the result count as filters change; the visible count above also changes on scroll, which would be noisy */}
+      <span role="status" className="sr-only">
+        {resultCount} exercise{resultCount === 1 ? '' : 's'} found
+      </span>
+    </search>
   )
 }
 
