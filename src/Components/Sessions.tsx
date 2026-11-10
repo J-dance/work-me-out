@@ -1,6 +1,6 @@
 import Layout from "./Layout";
 import type { Exercise, Screen, Workout } from "../types";
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { formatDuration, loadWorkouts, Timer } from "../utils";
 import { ExercisesContext } from "../context";
 import { imgBase } from "./ExerciseProvider";
@@ -123,13 +123,12 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
     }
   }
 
-  // keep the latest callback so the Timer (created once) never calls a stale one
-  const advanceRef = useRef(() => { })
-  useEffect(() => { advanceRef.current = () => goTo(index + 1, 'running') })
+  // effect event: always sees the latest index/goTo, so the Timer (created once) never calls a stale one
+  const onTimerFinish = useEffectEvent(() => goTo(index + 1, 'running'))
 
   // create the Timer once on mount, and stop it on unmount
   useEffect(() => {
-    const timer = new Timer(setRemaining, () => advanceRef.current(), 0)
+    const timer = new Timer(setRemaining, () => onTimerFinish(), 0)
     timerRef.current = timer
     return () => timer.stopTimer()
   }, [])
@@ -170,6 +169,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
         <button onClick={onExit} className="shrink-0 text-sm underline hover:text-primary">Change workout</button>
       </header>
 
+      {/* Progress bar */}
       <div className="h-2 w-full bg-tertiary" role="progressbar" aria-valuemin={0} aria-valuemax={phases.length} aria-valuenow={index}>
         <div className="h-full bg-primary transition-all" style={{ width: `${(index / phases.length) * 100}%` }} />
       </div>
