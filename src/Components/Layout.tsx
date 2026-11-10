@@ -13,8 +13,18 @@ export default function Layout({ children, setScreen, title }: props) {
     // Tighter on small phones/mini widths so content isn't squeezed by 48px of gutter.
     <div className="flex flex-col items-center justify-between h-full w-full gap-4 bg-bg py-6 px-(--page-px) [--page-px:--spacing(4)] sm:[--page-px:--spacing(6)]">
       <title>{`${title} · WorkMeOut`}</title>
-      <header className="max-w-full">
-        <h1 ref={headingRef} tabIndex={-1} className="text-3xl text-center text-balance wrap-break-word focus:outline-none">{title}</h1>
+      {/* 3-col grid: back link left, title centred, empty right column balances the left so the title stays truly centred */}
+      <header className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <button
+          type="button"
+          onClick={returnHome}
+          aria-label="Back to menu"
+          className="justify-self-start flex items-center gap-1 rounded-md px-2 py-1 hover:text-primary hover:cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          <span aria-hidden="true">←</span>
+          <span className="hidden sm:inline">Menu</span>
+        </button>
+        <h1 ref={headingRef} tabIndex={-1} className="min-w-0 text-3xl text-center text-balance wrap-break-word focus:outline-none">{title}</h1>
       </header>
       <main className="flex w-full flex-col items-center gap-4">
         {children}
