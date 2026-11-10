@@ -146,7 +146,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
   if (phases.length === 0) {
     return (
       <>
-        <h2 ref={headingRef} tabIndex={-1} className="text-3xl focus:outline-none">{workout.name}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">{workout.name}</h2>
         <p className="opacity-70">This workout has no exercises yet. Add some on the Workouts screen.</p>
         <button type="button" onClick={onExit} className="self-start underline hover:text-primary">Choose another workout</button>
       </>
@@ -190,8 +190,9 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
 
   return (
     <>
-      <header className="flex items-baseline justify-between gap-4">
-        <h2 ref={headingRef} tabIndex={-1} className="text-3xl focus:outline-none">{workout.name}</h2>
+      {/* wraps so "Change workout" drops under a long name on narrow screens instead of running off the edge */}
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 ref={headingRef} tabIndex={-1} className="min-w-0 text-2xl wrap-break-word focus:outline-none sm:text-3xl">{workout.name}</h2>
         <button type="button" onClick={onExit} className="shrink-0 text-sm underline hover:text-primary">Change workout</button>
       </header>
 
@@ -222,14 +223,14 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
               onClick={() => goTo(index - 1, status === 'ready' ? 'ready' : 'running')}
               disabled={index === 0}
               aria-label="Previous step"
-              className="border-2 border-outline p-3 hover:bg-tertiary disabled:opacity-40 disabled:hover:bg-transparent"
+              className="border-2 border-outline px-1 py-3 hover:bg-tertiary sm:p-3 disabled:opacity-40 disabled:hover:bg-transparent"
             >Back</button>
-            <button type="button" onClick={primary.onClick} className="border-2 border-primary p-3 hover:bg-primary hover:text-bg">{primary.label}</button>
+            <button type="button" onClick={primary.onClick} className="border-2 border-primary px-1 py-3 hover:bg-primary hover:text-bg sm:p-3">{primary.label}</button>
             <button
               type="button"
               aria-label="Skip step"
               onClick={() => goTo(index + 1, status === 'ready' ? 'ready' : status)}
-              className="border-2 border-outline p-3 hover:bg-tertiary"
+              className="border-2 border-outline px-1 py-3 hover:bg-tertiary sm:p-3"
             >Skip</button>
           </div>
 
@@ -244,7 +245,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
 function CurrentPhase({ phase, remaining, status }: { phase: Phase, remaining: number | null, status: Status }) {
   const clock = remaining !== null && (
     // role="timer" is not live by default, so it doesn't announce every second
-    <p role="timer" aria-label="Time remaining" className={`text-6xl tabular-nums ${status === 'paused' ? 'opacity-50' : ''}`}>
+    <p role="timer" aria-label="Time remaining" className={`text-6xl tabular-nums select-none ${status === 'paused' ? 'opacity-50' : ''}`}>
       <span aria-hidden="true">{formatDuration(remaining)}</span>
       <span className="sr-only">{speakDuration(remaining)}{status === 'paused' ? ', paused' : ''}</span>
     </p>
@@ -252,7 +253,7 @@ function CurrentPhase({ phase, remaining, status }: { phase: Phase, remaining: n
 
   if (phase.kind === 'rest') {
     return (
-      <div className="flex flex-col items-center gap-2 border-2 border-dashed border-secondary p-6 text-center">
+      <div className="flex flex-col items-center gap-2 border-2 border-dashed border-secondary p-4 text-center sm:p-6">
         <p className="text-sm uppercase tracking-wide opacity-70">{phase.label}</p>
         <h3 className="text-3xl">Rest</h3>
         {clock}
@@ -262,9 +263,9 @@ function CurrentPhase({ phase, remaining, status }: { phase: Phase, remaining: n
 
   const image = phase.exercise?.images[0]
   return (
-    <div className="flex flex-col items-center gap-2 border-2 border-primary p-6 text-center">
+    <div className="flex flex-col items-center gap-2 border-2 border-primary p-4 text-center sm:p-6">
       <p className="text-sm uppercase tracking-wide opacity-70">Set {phase.set} of {phase.sets}</p>
-      <h3 className="text-3xl">{phase.name}</h3>
+      <h3 className="max-w-full text-2xl wrap-break-word sm:text-3xl">{phase.name}</h3>
       {image && <img src={imgBase + image} alt={`${phase.name} demonstration`} className="max-h-48 rounded object-contain" />}
       {phase.reps !== null && <p className="text-2xl">{phase.reps} reps</p>}
       {clock}
@@ -297,10 +298,10 @@ function UpNext({ next, then }: { next: Phase | undefined, then: Phase | undefin
 function WorkoutComplete({ onRestart, onExit }: { onRestart: () => void, onExit: () => void }) {
   const headingRef = useFocusOnChange<HTMLHeadingElement>()
   return (
-    <div className="flex flex-col items-center gap-4 border-2 border-outline p-6 text-center">
-      <h3 ref={headingRef} tabIndex={-1} className="text-3xl focus:outline-none">Workout complete!</h3>
+    <div className="flex flex-col items-center gap-4 border-2 border-outline p-4 text-center sm:p-6">
+      <h3 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">Workout complete!</h3>
       <p className="opacity-70">Nice work.</p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <button type="button" onClick={onRestart} className="border-2 border-outline px-4 py-2 hover:bg-tertiary">Restart</button>
         <button type="button" onClick={onExit} className="border-2 border-outline px-4 py-2 hover:bg-tertiary">Choose another</button>
       </div>
@@ -317,7 +318,7 @@ function SelectWorkout({ setWorkout, setScreen }: { setWorkout: (workout: Workou
   if (workouts.length === 0) {
     return (
       <>
-        <h2 ref={headingRef} tabIndex={-1} className="text-3xl focus:outline-none">Select a workout</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">Select a workout</h2>
         <p className="opacity-70">You don't have any saved workouts yet.</p>
         <button type="button" onClick={() => setScreen('workouts')} className="self-start border-2 border-outline px-4 py-2 hover:bg-tertiary">Build a workout</button>
       </>
@@ -326,7 +327,7 @@ function SelectWorkout({ setWorkout, setScreen }: { setWorkout: (workout: Workou
 
   return (
     <>
-      <h2 ref={headingRef} tabIndex={-1} className="text-3xl focus:outline-none">
+      <h2 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">
         <label htmlFor="workout-select">Select a workout</label>
       </h2>
       <select

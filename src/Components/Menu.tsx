@@ -13,7 +13,7 @@ const Menu = ({ setScreen }: { setScreen: (screen: Screen) => void }) => {
   return (
     <main className="flex flex-col items-center gap-4">
       <title>WorkMeOut</title>
-      <h1 ref={headingRef} tabIndex={-1} className='text-5xl focus:outline-none'>WorkMeOut</h1>
+      <h1 ref={headingRef} tabIndex={-1} className='text-[clamp(2rem,15vw,3rem)] focus:outline-none'>WorkMeOut</h1>
       <nav aria-label="Main">
         <ul className="flex flex-col items-center justify-center gap-4">
           <li><MenuButton onClick={() => { setScreen('exercises') }} text="Exercises" /></li>

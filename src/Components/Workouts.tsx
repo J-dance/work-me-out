@@ -252,7 +252,7 @@ const DragHandle = ({ handleProps, label }: { handleProps: HandleProps, label: s
     aria-label={`Reorder ${label}`}
     aria-description="Use the up and down arrow keys to move"
     data-drag-handle
-    className="flex shrink-0 cursor-grab touch-none items-center self-stretch px-2 text-xl opacity-60 hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
+    className="flex shrink-0 cursor-grab touch-none items-center self-stretch px-1 text-xl sm:px-2 opacity-60 hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
     {...handleProps}
   >
     <span aria-hidden="true">⠿</span>
@@ -296,12 +296,12 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
   const update = <K extends keyof ExerciseStep>(key: K) => (value: ExerciseStep[K]) => onChange({ ...step, [key]: value })
 
   return (
-    <div className="flex gap-2 border-2 border-outline bg-bg p-3">
+    <div className="flex gap-1 border-2 border-outline bg-bg p-2 sm:gap-2 sm:p-3">
       <DragHandle handleProps={handleProps} label={name} />
       <div className="flex min-w-0 grow flex-col gap-3">
         <header className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="text-lg">{name}</h3>
+            <h3 className="text-lg wrap-break-word">{name}</h3>
             <p className="text-sm opacity-70">{describeSets(step)}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -310,19 +310,20 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
           </div>
         </header>
 
-        <div className="grid grid-cols-3 gap-2">
+        {/* 3 across normally; drops to 2 (then 1) on mini screens rather than squashing the inputs */}
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
           <NumberField label="Sets" value={step.sets} min={1} max={50} onChange={(v) => v !== null && update('sets')(v)} />
           <NumberField label="Reps" value={step.reps} min={1} optional onChange={update('reps')} />
           <NumberField label="Time" value={step.duration} min={1} optional suffix="s" onChange={update('duration')} />
         </div>
 
         {step.sets > 1 && (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="max-w-40">
             <NumberField label="Rest between sets" value={step.restBetweenSets} suffix="s" onChange={(v) => v !== null && update('restBetweenSets')(v)} />
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           {/* always rendered so screen readers pick up the message when it appears */}
           <span role="status" className="text-primary">
             {!isStepValid(step) && `${name}: set reps and/or time`}
@@ -343,14 +344,17 @@ const RestStepCard = ({ step, label, onChange, onRemove, handleProps }: {
   onRemove: () => void
   handleProps: HandleProps
 }) => (
-  <div className="flex items-center gap-2 border-2 border-dashed border-secondary bg-bg p-3">
+  <div className="flex items-center gap-1 border-2 border-dashed border-secondary bg-bg p-2 sm:gap-2 sm:p-3">
     <DragHandle handleProps={handleProps} label={label} />
-    <h3 className="grow">
-      <span aria-hidden="true">Rest · {formatDuration(step.duration)}</span>
-      <span className="sr-only">Rest, {speakDuration(step.duration)}</span>
-    </h3>
-    <div className="w-28">
-      <NumberField label="Duration" value={step.duration} min={1} suffix="s" onChange={(v) => v !== null && onChange({ ...step, duration: v })} />
+    {/* on mini screens the duration field wraps under the title instead of crushing it */}
+    <div className="flex min-w-0 grow flex-wrap items-center gap-x-2 gap-y-1">
+      <h3 className="grow whitespace-nowrap">
+        <span aria-hidden="true">Rest · {formatDuration(step.duration)}</span>
+        <span className="sr-only">Rest, {speakDuration(step.duration)}</span>
+      </h3>
+      <div className="w-28">
+        <NumberField label="Duration" value={step.duration} min={1} suffix="s" onChange={(v) => v !== null && onChange({ ...step, duration: v })} />
+      </div>
     </div>
     <RemoveButton onClick={onRemove} label={label} />
   </div>
@@ -474,7 +478,8 @@ const StepList = ({ steps, setSteps, exercisesById }: {
   return (
     <>
       {liveRegion}
-      <ol className="flex flex-col gap-3" aria-label="Workout steps">
+      {/* while dragging, a finger/mouse sweeping over other cards shouldn't start a text selection */}
+      <ol className={`flex flex-col gap-3 ${drag ? 'select-none' : ''}`} aria-label="Workout steps">
         {steps.map((step, index) => {
           const isDragged = drag?.from === index
           return (
@@ -557,7 +562,7 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-6">
         <header className="flex items-center justify-between gap-4">
           <h2 id={titleId} className="text-3xl">Add exercise</h2>
           <button
@@ -767,7 +772,7 @@ export default function Workouts({ setScreen }: { setScreen: (screen: Screen) =>
               const count = workout.steps.filter((s) => s.type === 'exercise').length
               return (
                 <li key={workout.id} className="relative flex w-full flex-col gap-1 border-2 border-outline p-4 hover:border-primary has-[button:focus-visible]:border-primary">
-                  <h2 className="text-xl">
+                  <h2 className="text-xl wrap-break-word">
                     {/* ::after stretches the click target over the whole card */}
                     <button
                       type="button"

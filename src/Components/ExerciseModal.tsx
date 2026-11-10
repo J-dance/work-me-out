@@ -41,9 +41,9 @@ export default function ExerciseModal({ data, onClose, action }: {
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
-      <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6 p-4 sm:p-6">
         <header className="flex items-start justify-between gap-4">
-          <h2 id={titleId} className="text-3xl">{data.name}</h2>
+          <h2 id={titleId} className="min-w-0 text-2xl wrap-break-word sm:text-3xl">{data.name}</h2>
           <button
             type="button"
             onClick={() => dialogRef.current?.close()}
@@ -69,7 +69,7 @@ export default function ExerciseModal({ data, onClose, action }: {
           </div>
         )}
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <dl className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,8rem),1fr))] gap-x-4 gap-y-2">
           {details.filter(([, value]) => value).map(([label, value]) => (
             <div key={label}>
               <dt className="text-sm opacity-70">{label}</dt>

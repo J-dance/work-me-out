@@ -9,10 +9,12 @@ export default function Layout({ children, setScreen, title }: props) {
   const headingRef = useFocusOnChange<HTMLHeadingElement>(title)
 
   return (
-    <div className="flex flex-col items-center justify-between h-full w-full gap-4 bg-bg p-6">
+    // --page-px is the side padding; full-bleed children (Exercises' sticky filter bar) read it to cancel it out.
+    // Tighter on small phones/mini widths so content isn't squeezed by 48px of gutter.
+    <div className="flex flex-col items-center justify-between h-full w-full gap-4 bg-bg py-6 px-(--page-px) [--page-px:--spacing(4)] sm:[--page-px:--spacing(6)]">
       <title>{`${title} · WorkMeOut`}</title>
-      <header>
-        <h1 ref={headingRef} tabIndex={-1} className="text-3xl focus:outline-none">{title}</h1>
+      <header className="max-w-full">
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl text-center text-balance wrap-break-word focus:outline-none">{title}</h1>
       </header>
       <main className="flex w-full flex-col items-center gap-4">
         {children}

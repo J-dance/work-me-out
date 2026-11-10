@@ -17,3 +17,23 @@
   color-scheme: dark;
   background-color: var(--color-bg);
 }
+
+/* stop pull-to-refresh / overscroll navigation when scrolling past the top of the page.
+   The page scrolls on the viewport, which reads this from the root element per spec,
+   so it is set on html as well as body (which some engines honour) */
+html,
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* touch UX: a long-press or double-tap on a control shouldn't select its text or pop the
+   iOS callout. Only controls with no editable text; labels and other ancestors of inputs are left
+   alone because iOS Safari can refuse focus/typing in inputs under user-select: none */
+@layer base {
+  button,
+  [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
