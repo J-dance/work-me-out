@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from "react"
 import type { Exercise } from '../types'
-import { imgBase } from "./ExerciseProvider"
+import ExerciseImage from "./ExerciseImage"
 import { lockScroll } from "../utils"
 
 const Tag = ({ children }: { children: React.ReactNode }) => (
@@ -58,9 +58,9 @@ export default function ExerciseModal({ data, onClose, action }: {
           // focusable so keyboard users can scroll the strip sideways
           <div className="flex gap-2 overflow-x-auto" role="region" aria-label="Images" tabIndex={0}>
             {data.images.map((src, i) => (
-              <img
+              <ExerciseImage
                 key={src}
-                src={imgBase + src}
+                src={src}
                 alt={`${data.name} demonstration, ${i + 1} of ${data.images.length}`}
                 loading="lazy"
                 className="w-full max-w-sm shrink-0 object-cover"

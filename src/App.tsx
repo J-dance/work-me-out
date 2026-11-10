@@ -8,6 +8,7 @@ import Session from './Components/Sessions'
 import { UserContext } from './context'
 import ExerciseProvider from './Components/ExerciseProvider'
 import ScreenErrorBoundary from './Components/ScreenErrorBoundary'
+import { InstallNotice, OfflineStatus } from './Components/Notices'
 
 const SCREEN_TITLES: Record<Screen, string> = {
   menu: 'WorkMeOut',
@@ -28,6 +29,9 @@ function App() {
         state: userData,
         setState: setUserData
       }}>
+        {/* outside ExerciseProvider so they still show while exercises load or fail to load */}
+        <OfflineStatus />
+        {screen === 'menu' && <InstallNotice />}
         <ExerciseProvider>
           {/* keyed by screen: each screen gets its own boundary, and switching screens clears any error */}
           <ScreenErrorBoundary

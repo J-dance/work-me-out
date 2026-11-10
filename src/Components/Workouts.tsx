@@ -2,8 +2,10 @@ import { use, useDeferredValue, useEffect, useId, useMemo, useRef, useState } fr
 import Layout from "./Layout"
 import type { Screen, Exercise, Workout, WorkoutStep, ExerciseStep, RestStep, BodyArea, Muscle, Equipment } from '../types'
 import { ExercisesContext } from "../context"
-import { formatDuration, loadWorkouts, lockScroll, saveWorkouts, speakDuration, uid } from "../utils"
+import { cacheImages, formatDuration, loadWorkouts, lockScroll, saveWorkouts, speakDuration, uid } from "../utils"
 import ExerciseModal from "./ExerciseModal"
+import { imgBase } from "./ExerciseProvider"
+import { DataNote } from "./Notices"
 
 // stable fallback so memoised values don't recompute every render
 const noExercises: Exercise[] = []
@@ -745,6 +747,15 @@ export default function Workouts({ setScreen }: { setScreen: (screen: Screen) =>
     saveWorkouts(next)
   }
 
+  // keep images for every saved workout available offline (also covers workouts saved before caching existed)
+  useEffect(() => {
+    const byId = new Map(exercises.map((e) => [e.id, e]))
+    const urls = workouts.flatMap((w) =>
+      w.steps.flatMap((s) => (s.type === 'exercise' ? (byId.get(s.exerciseId)?.images ?? []) : [])),
+    )
+    void cacheImages(urls.map((src) => imgBase + src))
+  }, [workouts, exercises])
+
   const isNew = editing !== null && !workouts.some((w) => w.id === editing.id)
 
   return (
@@ -802,6 +813,7 @@ export default function Workouts({ setScreen }: { setScreen: (screen: Screen) =>
           >
             +
           </button>
+          <DataNote />
         </section>
       )}
     </Layout>

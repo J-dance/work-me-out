@@ -1,5 +1,31 @@
-import { Component } from "react"
+import { Component, useEffect } from "react"
 import { ExercisesLoadError } from "../errors"
+import { useOnline } from "../utils"
+
+/**
+ * Explains a failed exercise load. Offline usually means the exercise list was never saved on
+ * this device (first visit, or website data was cleared), so say that, and retry by itself
+ * as soon as the connection comes back.
+ */
+function LoadFailedHelp() {
+  const online = useOnline()
+  useEffect(() => {
+    // the exercise fetch runs once at module load, so a reload is what retries it.
+    // Registered once for as long as this message shows: re-subscribing on `online` changes would
+    // remove the listener mid-event (React re-renders between listeners) and the retry would never run.
+    const retry = () => window.location.reload()
+    window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+  }, [])
+
+  return (
+    <p className="opacity-70">
+      {online
+        ? "Check your internet connection and try again."
+        : "You're offline, and the exercise list hasn't been saved on this device yet. Connect to the internet once and WorkMeOut will keep working offline after that. This page will retry when you're back online."}
+    </p>
+  )
+}
 
 interface Props {
   children: React.ReactNode
@@ -38,11 +64,9 @@ export default class ScreenErrorBoundary extends Component<Props, State> {
     return (
       <main role="alert" className="flex flex-col items-center gap-4 p-6 text-center">
         <h1 className="text-2xl">{loadFailed ? "Couldn't load exercises" : "Something went wrong"}</h1>
-        <p className="opacity-70">
-          {loadFailed
-            ? "Check your internet connection and try again."
-            : "This screen hit an unexpected error."}
-        </p>
+        {loadFailed
+          ? <LoadFailedHelp />
+          : <p className="opacity-70">This screen hit an unexpected error.</p>}
         <div className="flex gap-2">
           {this.props.onBackToMenu && (
             <button

@@ -1,9 +1,9 @@
 import Layout from "./Layout";
 import type { Exercise, Screen, Workout } from "../types";
 import { use, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
-import { formatDuration, loadWorkouts, speakDuration, Timer, useFocusOnChange } from "../utils";
+import { formatDuration, loadWorkouts, playBeep, speakDuration, Timer, unlockAudio, useFocusOnChange } from "../utils";
 import { ExercisesContext } from "../context";
-import { imgBase } from "./ExerciseProvider";
+import ExerciseImage from "./ExerciseImage";
 
 /** One thing to do during a session: a single set of an exercise, or a rest. */
 type Phase =
@@ -134,7 +134,10 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
   }
 
   // effect event: always sees the latest index/goTo, so the Timer (created once) never calls a stale one
-  const onTimerFinish = useEffectEvent(() => goTo(index + 1, 'running'))
+  const onTimerFinish = useEffectEvent(() => {
+    playBeep()
+    goTo(index + 1, 'running')
+  })
 
   // create the Timer once on mount, and stop it on unmount
   useEffect(() => {
@@ -164,6 +167,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
   }
 
   const resume = () => {
+    unlockAudio()
     const timer = timerRef.current
     if (timer && remaining !== null) {
       timer.setDuration(remaining)
@@ -176,7 +180,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
 
   // one button whose label and action change with the status, so focus stays on it when you press Start/Pause/Resume
   const primary = status === 'ready'
-    ? { label: 'Start', onClick: () => goTo(index, 'running') }
+    ? { label: 'Start', onClick: () => { unlockAudio(); goTo(index, 'running') } }
     : status === 'paused'
       ? { label: 'Resume', onClick: resume }
       : isTimed
@@ -266,7 +270,7 @@ function CurrentPhase({ phase, remaining, status }: { phase: Phase, remaining: n
     <div className="flex flex-col items-center gap-2 border-2 border-primary p-4 text-center sm:p-6">
       <p className="text-sm uppercase tracking-wide opacity-70">Set {phase.set} of {phase.sets}</p>
       <h3 className="max-w-full text-2xl wrap-break-word sm:text-3xl">{phase.name}</h3>
-      {image && <img src={imgBase + image} alt={`${phase.name} demonstration`} className="max-h-48 rounded object-contain" />}
+      {image && <ExerciseImage src={image} alt={`${phase.name} demonstration`} className="max-h-48 rounded object-contain" />}
       {phase.reps !== null && <p className="text-2xl">{phase.reps} reps</p>}
       {clock}
       {status === 'running' && phase.duration === null && <p className="text-sm opacity-70">Press Done when you finish the set</p>}

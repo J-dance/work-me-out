@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useSyncExternalStore } from "react"
 import type { Workout } from "./types"
 
 
@@ -96,6 +96,54 @@ export const saveWorkouts = (workouts: Workout[]): void => {
   localStorage.setItem(WORKOUTS_KEY, JSON.stringify(workouts))
 }
 
+/** Must match the image cacheName in vite.config.ts, so the service worker serves what we store here. */
+const EXERCISE_IMAGES_CACHE = 'exercise-images'
+
+/**
+ * Downloads images into the offline cache ahead of time (e.g. for a saved workout),
+ * skipping any already cached. Best effort: failures are ignored, the image just loads online later.
+ */
+export const cacheImages = async (urls: string[]): Promise<void> => {
+  if (!('caches' in window) || urls.length === 0) return // Cache API is missing outside secure contexts
+  try {
+    const cache = await caches.open(EXERCISE_IMAGES_CACHE)
+    await Promise.allSettled(
+      [...new Set(urls)].map(async (url) => {
+        if (!(await cache.match(url))) await cache.add(url)
+      }),
+    )
+  } catch {
+    // storage full or unavailable; nothing to do
+  }
+}
+
+const subscribeOnline = (onChange: () => void) => {
+  window.addEventListener('online', onChange)
+  window.addEventListener('offline', onChange)
+  return () => {
+    window.removeEventListener('online', onChange)
+    window.removeEventListener('offline', onChange)
+  }
+}
+
+/** True while the browser thinks it has a network connection; re-renders when that changes. */
+export const useOnline = (): boolean => useSyncExternalStore(subscribeOnline, () => navigator.onLine)
+
+/** Running as an installed app (home screen / dock) rather than in a browser tab. */
+export const isInstalledApp = (): boolean =>
+  window.matchMedia('(display-mode: standalone)').matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true
+
+/** iPhone/iPad. iPadOS reports itself as a Mac, so also check for touch. Every iOS browser runs on Safari's engine. */
+export const isIOS = (): boolean =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+/** Safari on a Mac (Chrome, Edge, Firefox etc. also put "Safari" in their user agent, so exclude them). */
+export const isMacSafari = (): boolean =>
+  !isIOS() && /Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) &&
+  !/Chrome|Chromium|Edg|Firefox|OPR/.test(navigator.userAgent)
+
 /** Seconds as m:ss, e.g. 90 -> "1:30". */
 export const formatDuration = (seconds: number): string => {
   const m = Math.floor(seconds / 60)
@@ -139,4 +187,42 @@ export const useFocusOnChange = <T extends HTMLElement>(key?: unknown) => {
     ref.current?.focus()
   }, [key])
   return ref
+}
+
+let audioCtx: AudioContext | null = null
+
+/**
+ * Creates/resumes the shared AudioContext. Must be called from a tap (e.g. Start/Resume),
+ * because iOS Safari only allows audio that was unlocked by a user gesture.
+ */
+export const unlockAudio = () => {
+  try {
+    // Safari 17+: play through the silent switch like a media app, instead of being muted by it
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+    if (session) session.type = 'playback'
+
+    audioCtx ??= new AudioContext()
+    if (audioCtx.state === 'suspended') void audioCtx.resume()
+  } catch (e) {
+    console.error('Could not start audio', e)
+  }
+}
+
+/** Three short beeps for when a timer finishes. Does nothing if audio was never unlocked. */
+export const playBeep = () => {
+  if (!audioCtx) return
+  const now = audioCtx.currentTime
+  for (let i = 0; i < 3; i++) {
+    const osc = audioCtx.createOscillator()
+    const gain = audioCtx.createGain()
+    osc.frequency.value = 880 // A5, a clear "timer" pitch
+    const t = now + i * 0.25
+    // quick fade in/out avoids clicks
+    gain.gain.setValueAtTime(0.0001, t)
+    gain.gain.exponentialRampToValueAtTime(0.4, t + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18)
+    osc.connect(gain).connect(audioCtx.destination)
+    osc.start(t)
+    osc.stop(t + 0.2)
+  }
 }
