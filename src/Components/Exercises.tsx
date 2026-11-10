@@ -85,7 +85,14 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
   const isFiltered = Object.values(filters).some(Boolean)
 
   return (
-    <search className="sticky top-0 z-10 flex w-full flex-col gap-3 bg-bg p-4" aria-label="Filter exercises">
+    // Full-bleed: -mx-6 cancels Layout's p-6 so the bar spans the whole viewport width,
+    // and px-10 (6 + 4) keeps the inputs where they were.
+    // iOS Safari shows page content under the status bar unless a fixed/sticky element
+    // touching the top edge spans the width; then it extends that element's colour there instead.
+    <search
+      className="sticky top-0 z-10 -mx-6 flex w-[calc(100%+3rem)] flex-col gap-3 bg-bg px-10 py-4"
+      aria-label="Filter exercises"
+    >
       <input
         type="search"
         aria-label="Search exercises"

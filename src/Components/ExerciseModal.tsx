@@ -39,7 +39,7 @@ export default function ExerciseModal({ data, onClose, action }: {
       ref={dialogRef}
       aria-labelledby={titleId}
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-bg text-white backdrop:bg-black/60"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
         <header className="flex items-start justify-between gap-4">

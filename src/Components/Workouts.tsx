@@ -195,7 +195,9 @@ const NumberField = ({ label, value, onChange, min = 0, max, optional = false, s
     setText(value?.toString() ?? '')
   }
 
-  const handleChange = (raw: string) => {
+  const handleChange = (input: string) => {
+    // text input (not type="number"), so drop anything that isn't a digit ourselves
+    const raw = input.replace(/\D/g, '')
     setText(raw)
     if (raw.trim() === '') {
       if (optional) onChange(null)
@@ -212,16 +214,19 @@ const NumberField = ({ label, value, onChange, min = 0, max, optional = false, s
         {suffix && <span className="sr-only"> ({suffix === 's' ? 'seconds' : suffix})</span>}
       </span>
       <span className="flex items-center border-2 border-outline focus-within:border-primary">
+        {/* type="text" + inputMode: same numeric keypad on phones, but no desktop spinners,
+            no scroll-wheel changes, and Firefox can't accept letters. Range is checked in handleChange. */}
         <input
-          type="number"
+          type="text"
           inputMode="numeric"
-          min={min}
-          max={max}
+          pattern="[0-9]*"
+          autoComplete="off"
           value={text}
           placeholder={optional ? '—' : undefined}
           onChange={(e) => handleChange(e.target.value)}
           onBlur={() => setText(value?.toString() ?? '')}
-          className="w-full min-w-0 bg-bg p-2 focus:outline-none"
+          // text-base (16px): anything smaller makes iOS Safari zoom the page on focus
+          className="w-full min-w-0 bg-bg p-2 text-base focus:outline-none"
         />
         {suffix && <span aria-hidden="true" className="pr-2 opacity-70">{suffix}</span>}
       </span>
@@ -550,7 +555,7 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
       aria-labelledby={titleId}
       // React passes the details modal's close event up to here, so ignore it unless this dialog closed
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none bg-bg text-white backdrop:bg-black/60"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
         <header className="flex items-center justify-between gap-4">
