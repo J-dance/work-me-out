@@ -55,15 +55,15 @@ export default function ExerciseModal({ data, onClose, action }: {
         </header>
 
         {data.images.length > 0 && (
-          // focusable so keyboard users can scroll the strip sideways
-          <div className="flex gap-2 overflow-x-auto" role="region" aria-label="Images" tabIndex={0}>
+          // side by side (start and end position), so there's no hidden image to scroll to
+          <div className={`grid gap-2 ${data.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {data.images.map((src, i) => (
               <ExerciseImage
                 key={src}
                 src={src}
                 alt={`${data.name} demonstration, ${i + 1} of ${data.images.length}`}
                 loading="lazy"
-                className="w-full max-w-sm shrink-0 object-cover"
+                className="w-full object-contain"
               />
             ))}
           </div>

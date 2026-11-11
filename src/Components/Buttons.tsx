@@ -9,3 +9,16 @@ export const MenuButton = ({ onClick, text }: { onClick: () => void, text: strin
     </button>
   )
 }
+
+/** Opens the full exercise details. */
+export const InfoButton = ({ onClick, label, className = '' }: { onClick: () => void, label: string, className?: string }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={`Details for ${label}`}
+    title="Exercise details"
+    className={`shrink-0 hover:text-primary focus-visible:text-primary ${className}`}
+  >
+    <span aria-hidden="true">ⓘ</span>
+  </button>
+)

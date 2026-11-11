@@ -1,14 +1,12 @@
-import { use, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react"
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react"
 import Layout from "./Layout"
 import type { Screen, Exercise, Workout, WorkoutStep, ExerciseStep, RestStep, BodyArea, Muscle, Equipment } from '../types'
-import { ExercisesContext } from "../context"
+import { useExercises } from "../context"
 import { cacheImages, formatDuration, loadWorkouts, lockScroll, saveWorkouts, speakDuration, uid } from "../utils"
 import ExerciseModal from "./ExerciseModal"
+import { InfoButton } from "./Buttons"
 import { imgBase } from "./ExerciseProvider"
 import { DataNote } from "./Notices"
-
-// stable fallback so memoised values don't recompute every render
-const noExercises: Exercise[] = []
 
 /** Gap between list items in px. Must match the `gap-3` on the step list. */
 const LIST_GAP = 12
@@ -258,19 +256,6 @@ const DragHandle = ({ handleProps, label }: { handleProps: HandleProps, label: s
     {...handleProps}
   >
     <span aria-hidden="true">⠿</span>
-  </button>
-)
-
-/** Opens the full exercise details. */
-const InfoButton = ({ onClick, label, className = '' }: { onClick: () => void, label: string, className?: string }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-label={`Details for ${label}`}
-    title="Exercise details"
-    className={`shrink-0 hover:text-primary focus-visible:text-primary ${className}`}
-  >
-    <span aria-hidden="true">ⓘ</span>
   </button>
 )
 
@@ -737,8 +722,7 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
  * @returns The workouts screen
  */
 export default function Workouts({ setScreen }: { setScreen: (screen: Screen) => void }) {
-  const exercisesPromise = use(ExercisesContext)
-  const exercises = exercisesPromise ? use(exercisesPromise) : noExercises
+  const exercises = useExercises()
   const [workouts, setWorkouts] = useState<Workout[]>(loadWorkouts)
   const [editing, setEditing] = useState<Workout | null>(null)
 

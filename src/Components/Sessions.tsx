@@ -1,9 +1,11 @@
 import Layout from "./Layout";
 import type { Exercise, Screen, Workout } from "../types";
-import { use, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
 import { formatDuration, loadWorkouts, playBeep, speakDuration, Timer, unlockAudio, useFocusOnChange, useWakeLock } from "../utils";
-import { ExercisesContext } from "../context";
+import { useExercises } from "../context";
 import ExerciseImage from "./ExerciseImage";
+import ExerciseModal from "./ExerciseModal";
+import { InfoButton } from "./Buttons";
 
 /** One thing to do during a session: a single set of an exercise, or a rest. */
 type Phase =
@@ -26,8 +28,6 @@ type Phase =
   }
 
 type Status = 'ready' | 'running' | 'paused' | 'done'
-
-const noExercises: Exercise[] = []
 
 /** Flattens a workout's steps into the ordered list of sets and rests to run through. */
 const buildPhases = (workout: Workout, exercisesById: Map<string, Exercise>): Phase[] => {
@@ -98,14 +98,14 @@ export default function Session({ setScreen }: { setScreen: (screen: Screen) => 
 }
 
 function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () => void }) {
-  const exercisesPromise = use(ExercisesContext)
-  const exercises = exercisesPromise ? use(exercisesPromise) : noExercises
+  const exercises = useExercises()
   const exercisesById = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises])
   const phases = useMemo(() => buildPhases(workout, exercisesById), [workout, exercisesById])
 
   const [index, setIndex] = useState(0)
   const [status, setStatus] = useState<Status>('ready')
   const [remaining, setRemaining] = useState<number | null>(phases[0]?.duration ?? null) // seconds
+  const [info, setInfo] = useState<Exercise | null>(null)
 
   const timerRef = useRef<Timer | null>(null)
   const headingRef = useFocusOnChange<HTMLHeadingElement>()
@@ -221,7 +221,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
         <WorkoutComplete onRestart={() => goTo(0, 'ready')} onExit={onExit} />
       ) : (
         <>
-          <CurrentPhase phase={phase} remaining={remaining} status={status} />
+          <CurrentPhase phase={phase} remaining={remaining} status={status} onInfo={setInfo} />
 
           <div className="grid grid-cols-3 gap-2" role="group" aria-label="Session controls">
             <button
@@ -243,12 +243,21 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
           <UpNext next={upNext} then={afterNext} />
         </>
       )}
+
+      {/* lives here rather than in CurrentPhase, so it stays open if the timer moves on to a rest */}
+      {info && <ExerciseModal data={info} onClose={() => setInfo(null)} />}
     </>
   )
 }
 
 /** Large display of what to do right now. */
-function CurrentPhase({ phase, remaining, status }: { phase: Phase, remaining: number | null, status: Status }) {
+function CurrentPhase({ phase, remaining, status, onInfo }: {
+  phase: Phase
+  remaining: number | null
+  status: Status
+  /** Opens the exercise details */
+  onInfo: (exercise: Exercise) => void
+}) {
   const clock = remaining !== null && (
     // role="timer" is not live by default, so it doesn't announce every second
     <p role="timer" aria-label="Time remaining" className={`text-6xl tabular-nums select-none ${status === 'paused' ? 'opacity-50' : ''}`}>
@@ -267,12 +276,28 @@ function CurrentPhase({ phase, remaining, status }: { phase: Phase, remaining: n
     )
   }
 
-  const image = phase.exercise?.images[0]
+  const { exercise } = phase
+  // the data has up to two images (start and end position), shown side by side
+  const images = exercise?.images.slice(0, 2) ?? []
   return (
     <div className="flex flex-col items-center gap-2 border-2 border-primary p-4 text-center sm:p-6">
       <p className="text-sm uppercase tracking-wide opacity-70">Set {phase.set} of {phase.sets}</p>
-      <h3 className="max-w-full text-2xl wrap-break-word sm:text-3xl">{phase.name}</h3>
-      {image && <ExerciseImage src={image} alt={`${phase.name} demonstration`} className="max-h-48 rounded object-contain" />}
+      <div className="flex max-w-full items-center justify-center gap-2">
+        <h3 className="min-w-0 text-2xl wrap-break-word sm:text-3xl">{phase.name}</h3>
+        {exercise && <InfoButton onClick={() => onInfo(exercise)} label={phase.name} className="border-2 border-outline px-2 text-xl hover:border-primary" />}
+      </div>
+      {images.length > 0 && (
+        <div className={`grid w-full gap-2 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {images.map((src, i) => (
+            <ExerciseImage
+              key={src}
+              src={src}
+              alt={`${phase.name} demonstration, ${i + 1} of ${images.length}`}
+              className="mx-auto max-h-48 w-full rounded object-contain"
+            />
+          ))}
+        </div>
+      )}
       {phase.reps !== null && <p className="text-2xl">{phase.reps} reps</p>}
       {clock}
       {status === 'running' && phase.duration === null && <p className="text-sm opacity-70">Press Done when you finish the set</p>}
