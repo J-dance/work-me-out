@@ -1,8 +1,14 @@
-import { use, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react"
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react"
 import Layout from "./Layout"
 import type { Screen, Exercise } from '../types'
-import { ExercisesContext } from "../context"
+import { useCustomExercises, useExercises } from "../context"
+import { loadWorkouts } from "../utils"
 import ExerciseModal from "./ExerciseModal"
+import CustomExerciseForm from "./CustomExerciseForm"
+
+/** How many saved workouts use an exercise, read fresh so it's right after edits on the Workouts screen. */
+const workoutsUsing = (exerciseId: string): number =>
+  loadWorkouts().filter((w) => w.steps.some((s) => s.type === 'exercise' && s.exerciseId === exerciseId)).length
 
 /**
  * Compact card shown in the exercise list.
@@ -20,9 +26,13 @@ const ExerciseCard = ({ data, onSelect }: { data: Exercise, onSelect: () => void
           {data.name}
         </button>
       </h2>
-      <p className="text-sm capitalize opacity-70">
-        {data.level} · {data.category}
-        {data.equipment && ` · ${data.equipment}`}
+      {/* separate flex items: Chrome won't capitalise the first word when it follows an inline badge */}
+      <p className="flex flex-wrap items-center gap-x-2 text-sm opacity-70">
+        {data.custom && <span className="rounded-full bg-tertiary px-2 py-0.5">Yours</span>}
+        <span className="capitalize">
+          {data.level} · {data.category}
+          {data.equipment && ` · ${data.equipment}`}
+        </span>
       </p>
       <p className="text-sm capitalize">
         <span className="sr-only">Primary muscles: </span>
@@ -41,9 +51,6 @@ type Filters = {
 }
 
 const emptyFilters: Filters = { search: '', muscle: '', level: '', category: '', equipment: '' }
-
-// stable fallback so memoised filters don't recompute every render
-const noExercises: Exercise[] = []
 
 // how many cards to render per "page" of the infinite scroll
 const PAGE_SIZE = 30
@@ -150,9 +157,11 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
 * @returns The exercises screen
 */
 export default function Exercises({ setScreen }: { setScreen: (screen: Screen) => void }) {
-  const exercisesPromise = use(ExercisesContext)
-  const exercises = exercisesPromise ? use(exercisesPromise) : noExercises
+  const exercises = useExercises()
+  const { add, update, remove } = useCustomExercises()
   const [selected, setSelected] = useState<Exercise | null>(null)
+  // 'new' for the create form, or the custom exercise being edited
+  const [form, setForm] = useState<'new' | Exercise | null>(null)
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   // empty element after the last card; when it scrolls into view we load the next page
@@ -211,7 +220,16 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
         resultCount={filtered.length}
         shownCount={visible.length}
       />
-      <ul className="flex h-full w-full flex-col gap-4 py-4 sm:px-4">
+      <div className="w-full sm:px-4">
+        <button
+          type="button"
+          onClick={() => setForm('new')}
+          className="w-full border-2 border-dashed border-outline p-3 hover:border-primary hover:bg-tertiary"
+        >
+          + New exercise
+        </button>
+      </div>
+      <ul className="flex h-full w-full flex-col gap-4 pb-4 sm:px-4">
         {visible.map((data) => (
           <li key={data.id}>
             <ExerciseCard data={data} onSelect={() => setSelected(data)} />
@@ -222,7 +240,24 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
           <li className="text-center opacity-70">No exercises match your filters.</li>
         )}
       </ul>
-      {selected && <ExerciseModal data={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ExerciseModal
+          data={selected}
+          onClose={() => setSelected(null)}
+          onEdit={selected.custom ? () => setForm(selected) : undefined}
+        />
+      )}
+      {form && (
+        <CustomExerciseForm
+          initial={form === 'new' ? undefined : form}
+          // prefill from the filters so a "no results" search turns straight into a new exercise
+          draft={form === 'new' ? { name: filters.search.trim() } : undefined}
+          usedIn={form === 'new' ? 0 : workoutsUsing(form.id)}
+          onSave={(exercise) => (form === 'new' ? add(exercise) : update(exercise))}
+          onDelete={form === 'new' ? undefined : () => remove(form.id)}
+          onClose={() => setForm(null)}
+        />
+      )}
     </Layout>
   )
 }

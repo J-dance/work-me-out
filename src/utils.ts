@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
-import type { Workout } from "./types"
+import type { Exercise, Workout } from "./types"
 
 
 export class Timer {
@@ -94,6 +94,27 @@ export const loadWorkouts = (): Workout[] => {
 
 export const saveWorkouts = (workouts: Workout[]): void => {
   localStorage.setItem(WORKOUTS_KEY, JSON.stringify(workouts))
+}
+
+const CUSTOM_EXERCISES_KEY = 'customExercises'
+
+/** Prefix for custom exercise ids, so they can never clash with database ids like "3_4_Sit-Up". */
+export const CUSTOM_ID_PREFIX = 'custom-'
+
+export const newCustomExerciseId = (): string => CUSTOM_ID_PREFIX + uid()
+
+/** Exercises the user has made, from localStorage, or an empty list if none/unreadable. */
+export const loadCustomExercises = (): Exercise[] => {
+  try {
+    const data: unknown = JSON.parse(localStorage.getItem(CUSTOM_EXERCISES_KEY) ?? '[]')
+    return Array.isArray(data) ? data as Exercise[] : []
+  } catch {
+    return []
+  }
+}
+
+export const saveCustomExercises = (exercises: Exercise[]): void => {
+  localStorage.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(exercises))
 }
 
 /** Must match the image cacheName in vite.config.ts, so the service worker serves what we store here. */

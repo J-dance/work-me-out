@@ -1,7 +1,8 @@
-import { Suspense } from "react"
-import { ExercisesContext } from "../context"
+import { Suspense, useMemo, useState } from "react"
+import { CustomExercisesContext, ExercisesContext, type CustomExercisesValue } from "../context"
 import type { Exercise } from "../types"
 import { ExercisesLoadError } from "../errors"
+import { loadCustomExercises, saveCustomExercises } from "../utils"
 
 const base = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@79ca7b4'
 const exercisesUrl = `${base}/dist/exercises.json`
@@ -52,10 +53,29 @@ function Spinner() {
 }
 
 export default function ExerciseProvider({ children }: { children: React.ReactNode }) {
+  const [custom, setCustom] = useState<Exercise[]>(loadCustomExercises)
+
+  const value = useMemo<CustomExercisesValue>(() => {
+    // save inside the updater so quick edits always build on the latest list
+    const change = (fn: (prev: Exercise[]) => Exercise[]) => setCustom((prev) => {
+      const next = fn(prev)
+      saveCustomExercises(next)
+      return next
+    })
+    return {
+      custom,
+      add: (exercise) => change((prev) => [{ ...exercise, custom: true }, ...prev]),
+      update: (exercise) => change((prev) => prev.map((e) => (e.id === exercise.id ? { ...exercise, custom: true } : e))),
+      remove: (id) => change((prev) => prev.filter((e) => e.id !== id)),
+    }
+  }, [custom])
+
   return (
     <Suspense fallback={<Spinner />}>
       <ExercisesContext value={exercisesPromise}>
-        {children}
+        <CustomExercisesContext value={value}>
+          {children}
+        </CustomExercisesContext>
       </ExercisesContext>
     </Suspense>
   )

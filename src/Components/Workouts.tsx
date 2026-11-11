@@ -1,9 +1,10 @@
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react"
 import Layout from "./Layout"
 import type { Screen, Exercise, Workout, WorkoutStep, ExerciseStep, RestStep, BodyArea, Muscle, Equipment } from '../types'
-import { useExercises } from "../context"
+import { useCustomExercises, useExercises } from "../context"
 import { cacheImages, formatDuration, loadWorkouts, lockScroll, saveWorkouts, speakDuration, uid } from "../utils"
 import ExerciseModal from "./ExerciseModal"
+import CustomExerciseForm, { type CustomExerciseDraft } from "./CustomExerciseForm"
 import { InfoButton } from "./Buttons"
 import { imgBase } from "./ExerciseProvider"
 import { DataNote } from "./Notices"
@@ -153,6 +154,16 @@ const FocusSelect = ({ value, onChange }: { value: Focus, onChange: React.Dispat
     </div>
   )
 }
+
+/**
+ * Starting values for an exercise created from the picker: the search text, plus whatever the filters pin down.
+ * Areas with a single muscle (chest, core) count as picking that muscle; one equipment chip counts as picking it.
+ */
+const draftFromPicker = (search: string, { equipment, areas, muscles }: Focus): CustomExerciseDraft => ({
+  name: search.trim(),
+  equipment: equipment.length === 1 ? equipment[0] : undefined,
+  primaryMuscles: [...new Set([...muscles, ...areas.filter((a) => BODY_AREAS[a].length === 1).flatMap((a) => BODY_AREAS[a])])],
+})
 
 /** Estimated workout length in seconds. Timed sets use their duration, rep-only sets are estimated. */
 const estimateSeconds = (steps: WorkoutStep[]): number => steps.reduce((total, step) => {
@@ -527,6 +538,8 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
   const [search, setSearch] = useState('')
   const deferredSearch = useDeferredValue(search)
   const [info, setInfo] = useState<Exercise | null>(null)
+  const [creating, setCreating] = useState(false)
+  const { add } = useCustomExercises()
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -571,6 +584,14 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
           className="w-full border-2 border-outline bg-bg p-2 focus:border-primary focus:outline-none"
         />
         <FocusSelect value={focus} onChange={setFocus} />
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="border-2 border-dashed border-outline p-3 text-left hover:border-primary hover:bg-tertiary"
+        >
+          {/* when nothing matches, offer the search text as the name */}
+          {matches.length === 0 && search.trim() ? `+ Create "${search.trim()}"` : '+ Create your own exercise'}
+        </button>
         <p role="status" className="sr-only">{matches.length} exercise{matches.length === 1 ? '' : 's'} found</p>
         <ul className="flex flex-col gap-2" aria-label="Exercises">
           {matches.slice(0, PICKER_LIMIT).map((exercise) => (
@@ -580,7 +601,10 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
                 onClick={() => onPick(exercise)}
                 className="flex min-w-0 grow flex-col p-3 text-left focus-visible:outline-none"
               >
-                <span>{exercise.name}</span>
+                <span>
+                  {exercise.name}
+                  {exercise.custom && <span className="ml-2 rounded-full bg-tertiary px-2 py-0.5 text-sm">Yours</span>}
+                </span>
                 <span className="text-sm capitalize opacity-70">
                   <span className="sr-only">, works </span>
                   {exercise.primaryMuscles.join(', ')}
@@ -602,6 +626,16 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
           data={info}
           onClose={() => setInfo(null)}
           action={{ label: 'Add to workout', onClick: () => onPick(info) }}
+        />
+      )}
+      {creating && (
+        <CustomExerciseForm
+          draft={draftFromPicker(search, focus)}
+          onSave={(exercise) => {
+            add(exercise)
+            onPick(exercise)
+          }}
+          onClose={() => setCreating(false)}
         />
       )}
     </dialog>

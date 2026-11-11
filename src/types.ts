@@ -61,6 +61,8 @@ export type Exercise = {
   category: Category
   /** Relative paths, e.g. "3_4_Sit-Up/0.jpg" */
   images: string[]
+  /** Made by the user and saved in localStorage, rather than from the exercise database. */
+  custom?: true
 }
 
 /** An exercise performed for one or more straight sets. */

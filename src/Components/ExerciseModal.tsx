@@ -10,12 +10,14 @@ const Tag = ({ children }: { children: React.ReactNode }) => (
 /**
  * Full-screen detail view for a single exercise.
  * Pass `action` to show a button at the bottom (e.g. "Add to workout"); the modal closes after it runs.
+ * Pass `onEdit` to show an Edit button (for custom exercises); the modal closes after it runs.
  * Can be opened on top of another dialog.
  */
-export default function ExerciseModal({ data, onClose, action }: {
+export default function ExerciseModal({ data, onClose, action, onEdit }: {
   data: Exercise
   onClose: () => void
   action?: { label: string, onClick: () => void }
+  onEdit?: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -43,15 +45,32 @@ export default function ExerciseModal({ data, onClose, action }: {
     >
       <div className="mx-auto flex max-w-2xl flex-col gap-6 p-4 sm:p-6">
         <header className="flex items-start justify-between gap-4">
-          <h2 id={titleId} className="min-w-0 text-2xl wrap-break-word sm:text-3xl">{data.name}</h2>
-          <button
-            type="button"
-            onClick={() => dialogRef.current?.close()}
-            aria-label="Close details"
-            className="shrink-0 border-2 border-outline px-3 py-1 text-xl hover:border-primary"
-          >
-            ✕
-          </button>
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-2xl wrap-break-word sm:text-3xl">{data.name}</h2>
+            {data.custom && <p className="text-sm opacity-70">Your exercise</p>}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEdit()
+                  dialogRef.current?.close()
+                }}
+                className="border-2 border-outline px-3 py-1 hover:border-primary"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => dialogRef.current?.close()}
+              aria-label="Close details"
+              className="border-2 border-outline px-3 py-1 text-xl hover:border-primary"
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         {data.images.length > 0 && (
