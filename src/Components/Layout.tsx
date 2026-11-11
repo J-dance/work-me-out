@@ -7,11 +7,17 @@ export default function Layout({ children, setScreen, title }: props) {
   const returnHome = () => { setScreen('menu') }
   // move focus to the heading whenever the screen changes, so screen readers announce where you are
   const headingRef = useFocusOnChange<HTMLHeadingElement>(title)
+  const backToTop = () => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
+    // move focus too, so keyboard/screen-reader users land at the top as well
+    headingRef.current?.focus({ preventScroll: true })
+  }
 
   return (
     // --page-px is the side padding; full-bleed children (Exercises' sticky filter bar) read it to cancel it out.
     // Tighter on small phones/mini widths so content isn't squeezed by 48px of gutter.
-    <div className="flex flex-col items-center justify-between h-full w-full gap-4 bg-bg py-6 px-(--page-px) [--page-px:--spacing(4)] sm:[--page-px:--spacing(6)]">
+    <div className="flex flex-col items-center justify-between flex-1 w-full gap-4 bg-bg py-6 px-(--page-px) [--page-px:--spacing(4)] sm:[--page-px:--spacing(6)]">
       <title>{`${title} · WorkMeOut`}</title>
       {/* 3-col grid: back link left, title centred, empty right column balances the left so the title stays truly centred */}
       <header className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
@@ -30,7 +36,7 @@ export default function Layout({ children, setScreen, title }: props) {
         {children}
       </main>
       <footer className="flex flex-col justify-center align-middle gap-2 text-center">
-        <button type="button" className="underline hover:text-primary" onClick={returnHome}>Menu</button>
+        <button type="button" className="underline hover:text-primary" onClick={backToTop}>Back to top</button>
         <p>© 2026 WorkMeOut</p>
       </footer>
     </div>
