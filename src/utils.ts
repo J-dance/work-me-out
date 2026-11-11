@@ -286,22 +286,27 @@ export const unlockAudio = () => {
   }
 }
 
-/** Three short beeps for when a timer finishes. Does nothing if audio was never unlocked. */
+/** Two rounds of three beeps for when a timer finishes. Does nothing if audio was never unlocked. */
 export const playBeep = () => {
   if (!audioCtx) return
   const now = audioCtx.currentTime
-  for (let i = 0; i < 3; i++) {
-    const osc = audioCtx.createOscillator()
-    const gain = audioCtx.createGain()
-    osc.frequency.value = 880 // A5, a clear "timer" pitch
-    const t = now + i * 0.25
-    // quick fade in/out avoids clicks
-    gain.gain.setValueAtTime(0.0001, t)
-    gain.gain.exponentialRampToValueAtTime(0.4, t + 0.01)
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18)
-    osc.connect(gain).connect(audioCtx.destination)
-    osc.start(t)
-    osc.stop(t + 0.2)
+  for (let round = 0; round < 2; round++) {
+    for (let i = 0; i < 3; i++) {
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      // square wave carries far more energy than a sine, so it cuts through music/noise
+      osc.type = 'square'
+      osc.frequency.value = 880 // A5, a clear "timer" pitch
+      const t = now + round * 1 + i * 0.25
+      // quick fade in/out avoids clicks
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.8, t + 0.01)
+      gain.gain.setValueAtTime(0.8, t + 0.15)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2)
+      osc.connect(gain).connect(audioCtx.destination)
+      osc.start(t)
+      osc.stop(t + 0.22)
+    }
   }
 }
 
