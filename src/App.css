@@ -29,6 +29,16 @@
 
   /* rounded system font: SF Pro Rounded on Apple devices, plain system UI elsewhere. Nothing to download, so it works offline */
   --font-sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* exercise dialog: the next/previous exercise slides in from the side it came from */
+  --animate-slide-from-right: slide-from-right 200ms ease-out;
+  --animate-slide-from-left: slide-from-left 200ms ease-out;
+  @keyframes slide-from-right {
+    from { opacity: 0; transform: translateX(2rem); }
+  }
+  @keyframes slide-from-left {
+    from { opacity: 0; transform: translateX(-2rem); }
+  }
 }
 
 /* --page-px is the side padding used by every screen. Full-bleed children (Exercises' sticky filter bar)

@@ -1,24 +1,49 @@
-import { useEffect, useId, useRef } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import type { Exercise } from '../types'
 import ExerciseImage from "./ExerciseImage"
 import { lockScroll } from "../utils"
 import { LevelBars, MuscleChip } from "./ExerciseBits"
 import { focusRing, iconButton, softButton } from "../styles"
 
+/** A swipe must travel this far sideways (px), and mostly sideways, so scrolling never changes exercise. */
+const SWIPE_MIN = 60
+/** Touches starting this close to a side edge are left to the browser (iOS Safari's back/forward swipe). */
+const EDGE = 24
+
 /**
  * Full-screen detail view for a single exercise.
  * Pass `action` to show a button at the bottom (e.g. "Add to workout"); the modal closes after it runs.
  * Pass `onEdit` to show an Edit button (for custom exercises); the modal closes after it runs.
+ * Pass `onPrev`/`onNext` to step through a list: swipe (left = next), arrow keys, or the ‹ › buttons.
+ * Leave one out at the end of the list; leave both out to hide the buttons.
  * Can be opened on top of another dialog.
  */
-export default function ExerciseModal({ data, onClose, action, onEdit }: {
+export default function ExerciseModal({ data, onClose, action, onEdit, onPrev, onNext }: {
   data: Exercise
   onClose: () => void
   action?: { label: string, onClick: () => void }
   onEdit?: () => void
+  onPrev?: () => void
+  onNext?: () => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
+  // which way we last moved, so the new exercise slides in from that side (null: just opened)
+  const [direction, setDirection] = useState<'prev' | 'next' | null>(null)
+  const touchStart = useRef<{ x: number, y: number } | null>(null)
+  const hasNav = Boolean(onPrev || onNext)
+
+  const go = (dir: 'prev' | 'next') => {
+    const move = dir === 'prev' ? onPrev : onNext
+    if (!move) return
+    setDirection(dir)
+    move()
+  }
+
+  // a new exercise starts at its top, not wherever the last one was scrolled to
+  useEffect(() => {
+    dialogRef.current?.scrollTo({ top: 0 })
+  }, [data.id])
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -39,12 +64,64 @@ export default function ExerciseModal({ data, onClose, action, onEdit }: {
       ref={dialogRef}
       aria-labelledby={titleId}
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
+      onKeyDown={(e) => {
+        if (!hasNav || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+        if (e.key === 'ArrowLeft') go('prev')
+        else if (e.key === 'ArrowRight') go('next')
+      }}
+      onTouchStart={(e) => {
+        const t = e.touches[0]
+        // one finger only (not pinch-zoom), and not from the very edges
+        touchStart.current = hasNav && e.touches.length === 1 && t.clientX > EDGE && t.clientX < window.innerWidth - EDGE
+          ? { x: t.clientX, y: t.clientY }
+          : null
+      }}
+      onTouchEnd={(e) => {
+        const start = touchStart.current
+        touchStart.current = null
+        if (!start) return
+        const t = e.changedTouches[0]
+        const dx = t.clientX - start.x
+        const dy = t.clientY - start.y
+        if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 1.5) return
+        // like flipping pages: drag left to bring in the next one
+        go(dx < 0 ? 'next' : 'prev')
+      }}
+      onTouchCancel={() => { touchStart.current = null }}
+      className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none touch-pan-y touch-pinch-zoom overflow-x-hidden overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
-      {/* same side padding and column width as the screens */}
-      <div className="mx-auto flex max-w-[calc(var(--container-2xl)+2*var(--page-px))] flex-col gap-8 px-(--page-px) py-6">
+      {/* same side padding and column width as the screens. Keyed so each new exercise re-runs the slide-in */}
+      <div
+        key={data.id}
+        className={`mx-auto flex max-w-[calc(var(--container-2xl)+2*var(--page-px))] flex-col gap-8 px-(--page-px) py-6 ${
+          direction === 'next' ? 'motion-safe:animate-slide-from-right' : direction === 'prev' ? 'motion-safe:animate-slide-from-left' : ''
+        }`}
+      >
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center gap-2">
+            {hasNav && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => go('prev')}
+                  disabled={!onPrev}
+                  aria-label="Previous exercise"
+                  className={`size-10 text-xl ${iconButton} disabled:cursor-default disabled:opacity-40 disabled:hover:bg-surface`}
+                >
+                  <span aria-hidden="true">‹</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => go('next')}
+                  disabled={!onNext}
+                  aria-label="Next exercise"
+                  className={`size-10 text-xl ${iconButton} disabled:cursor-default disabled:opacity-40 disabled:hover:bg-surface`}
+                >
+                  <span aria-hidden="true">›</span>
+                </button>
+              </>
+            )}
+            <div className="flex-1" />
             {onEdit && (
               <button
                 type="button"

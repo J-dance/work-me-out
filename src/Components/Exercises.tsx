@@ -194,6 +194,14 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
   const visible = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
 
+  // position of the open exercise in the filtered list, for the dialog's previous/next
+  const selectedIndex = selected ? filtered.findIndex((e) => e.id === selected.id) : -1
+  const openAt = (i: number) => {
+    setSelected(filtered[i])
+    // keep the list behind in step, so stepping past the loaded cards loads them too
+    if (i >= visibleCount) setVisibleCount(Math.ceil((i + 1) / PAGE_SIZE) * PAGE_SIZE)
+  }
+
   // any filter change starts the list again from the first page
   const updateFilters = (next: Filters) => {
     setFilters(next)
@@ -245,6 +253,8 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
           data={selected}
           onClose={() => setSelected(null)}
           onEdit={selected.custom ? () => setForm(selected) : undefined}
+          onPrev={selectedIndex > 0 ? () => openAt(selectedIndex - 1) : undefined}
+          onNext={selectedIndex >= 0 && selectedIndex < filtered.length - 1 ? () => openAt(selectedIndex + 1) : undefined}
         />
       )}
       {form && (
