@@ -21,7 +21,7 @@ export function InstallNotice() {
   }
 
   return (
-    <aside aria-label="Install the app" className="w-full max-w-md border-2 border-primary p-4 text-left">
+    <aside aria-label="Install the app" className="w-full max-w-2xl rounded-2xl border-2 border-primary bg-surface p-4 text-left">
       <h2 className="text-lg">{ios ? 'Add WorkMeOut to your Home Screen' : 'Add WorkMeOut to your Dock'}</h2>
       <p className="mt-1 text-sm">
         In a browser tab, Safari deletes your saved workouts if you don't open WorkMeOut for 7 days.
@@ -32,7 +32,7 @@ export function InstallNotice() {
           ? <>Tap the <strong>Share</strong> button (in Safari it may be under <strong>⋯</strong>), then <strong>Add to Home Screen</strong>. Open WorkMeOut from there from now on.</>
           : <>In Safari's menu bar choose <strong>File → Add to Dock</strong>, then open WorkMeOut from your Dock.</>}
       </p>
-      <button type="button" onClick={dismiss} className="mt-3 border-2 border-outline px-3 py-1 text-sm hover:border-primary">
+      <button type="button" onClick={dismiss} className="mt-3 rounded-full border-2 border-outline px-4 py-1 text-sm hover:border-primary">
         Got it
       </button>
     </aside>
@@ -42,7 +42,7 @@ export function InstallNotice() {
 /** Where workouts live and what deletes them. Shown on the Workouts screen. */
 export function DataNote() {
   return (
-    <p className="max-w-md text-center text-sm opacity-70">
+    <p className="mx-auto mt-4 max-w-md text-center text-sm text-white/75">
       Workouts are saved on this device only. Clearing your browser's website data, or deleting the app
       from your Home Screen, deletes them.
     </p>

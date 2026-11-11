@@ -2,10 +2,8 @@ import { useEffect, useId, useRef } from "react"
 import type { Exercise } from '../types'
 import ExerciseImage from "./ExerciseImage"
 import { lockScroll } from "../utils"
-
-const Tag = ({ children }: { children: React.ReactNode }) => (
-  <li className="rounded-full bg-tertiary px-3 py-1 text-sm capitalize">{children}</li>
-)
+import { LevelBars, MuscleChip } from "./ExerciseBits"
+import { focusRing, iconButton, softButton } from "../styles"
 
 /**
  * Full-screen detail view for a single exercise.
@@ -28,8 +26,8 @@ export default function ExerciseModal({ data, onClose, action, onEdit }: {
     return lockScroll()
   }, [])
 
+  // level first; it gets the bars, the rest are plain text
   const details: [string, string | null][] = [
-    ['Level', data.level],
     ['Category', data.category],
     ['Equipment', data.equipment],
     ['Force', data.force],
@@ -43,13 +41,10 @@ export default function ExerciseModal({ data, onClose, action, onEdit }: {
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
-      <div className="mx-auto flex max-w-2xl flex-col gap-6 p-4 sm:p-6">
-        <header className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-2xl wrap-break-word sm:text-3xl">{data.name}</h2>
-            {data.custom && <p className="text-sm opacity-70">Your exercise</p>}
-          </div>
-          <div className="flex shrink-0 gap-2">
+      {/* same side padding and column width as the screens */}
+      <div className="mx-auto flex max-w-[calc(var(--container-2xl)+2*var(--page-px))] flex-col gap-8 px-(--page-px) py-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-end gap-2">
             {onEdit && (
               <button
                 type="button"
@@ -57,7 +52,7 @@ export default function ExerciseModal({ data, onClose, action, onEdit }: {
                   onEdit()
                   dialogRef.current?.close()
                 }}
-                className="border-2 border-outline px-3 py-1 hover:border-primary"
+                className={`${softButton} py-2 text-sm`}
               >
                 Edit
               </button>
@@ -66,62 +61,84 @@ export default function ExerciseModal({ data, onClose, action, onEdit }: {
               type="button"
               onClick={() => dialogRef.current?.close()}
               aria-label="Close details"
-              className="border-2 border-outline px-3 py-1 text-xl hover:border-primary"
+              className={`size-10 ${iconButton}`}
             >
-              ✕
+              <span aria-hidden="true">✕</span>
             </button>
           </div>
-        </header>
+          <header className="flex flex-col gap-3">
+            <h2 id={titleId} className="text-[clamp(1.75rem,7vw,2.25rem)] font-bold leading-tight tracking-tight text-balance wrap-break-word">
+              {data.name}
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {data.custom && <span className="rounded-full bg-bg/60 px-3 py-1 text-sm text-primary ring-1 ring-primary/40">Your exercise</span>}
+              <ul aria-label="Main muscles" className="contents">
+                {data.primaryMuscles.map((m) => <li key={m}><MuscleChip muscle={m} size="md" /></li>)}
+              </ul>
+            </div>
+          </header>
+        </div>
 
         {data.images.length > 0 && (
           // side by side (start and end position), so there's no hidden image to scroll to
-          <div className={`grid gap-2 ${data.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-3 ${data.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {data.images.map((src, i) => (
               <ExerciseImage
                 key={src}
                 src={src}
                 alt={`${data.name} demonstration, ${i + 1} of ${data.images.length}`}
                 loading="lazy"
-                className="w-full object-contain"
+                className="w-full rounded-2xl object-contain"
               />
             ))}
           </div>
         )}
 
-        <dl className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,8rem),1fr))] gap-x-4 gap-y-2">
+        {/* small stat tiles: 2 across on phones, as many as fit when roomy */}
+        <dl className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,8.5rem),1fr))] gap-3">
+          <div className="flex flex-col gap-1 rounded-2xl bg-surface px-4 py-3">
+            <dt className="text-xs text-white/75">Level</dt>
+            <dd className="flex items-center gap-2 font-medium capitalize"><LevelBars level={data.level} />{data.level}</dd>
+          </div>
           {details.filter(([, value]) => value).map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-sm opacity-70">{label}</dt>
-              <dd className="capitalize">{value}</dd>
+            <div key={label} className="flex flex-col gap-1 rounded-2xl bg-surface px-4 py-3">
+              <dt className="text-xs text-white/75">{label}</dt>
+              <dd className="font-medium capitalize">{value}</dd>
             </div>
           ))}
         </dl>
 
-        <section className="flex flex-col gap-2">
-          <h3 className="text-xl">Muscles</h3>
-          {/* primary vs secondary was only shown by opacity, so label the lists for screen readers */}
-          <ul aria-label="Primary muscles" className="flex flex-wrap gap-2">
-            {data.primaryMuscles.map((m) => <Tag key={m}>{m}</Tag>)}
-          </ul>
-          {data.secondaryMuscles.length > 0 && (
-            <ul aria-label="Secondary muscles" className="flex flex-wrap gap-2 opacity-70">
-              {data.secondaryMuscles.map((m) => <Tag key={m}>{m}</Tag>)}
+        {/* the main muscles are the coloured chips under the title */}
+        {data.secondaryMuscles.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h3 id={`${titleId}-secondary`} className="text-lg font-semibold">Also works</h3>
+            <ul aria-labelledby={`${titleId}-secondary`} className="flex flex-wrap gap-2">
+              {data.secondaryMuscles.map((m) => <li key={m}><MuscleChip muscle={m} size="md" muted /></li>)}
             </ul>
-          )}
-        </section>
+          </section>
+        )}
 
         {data.instructions.length > 0 && (
-          <section className="flex flex-col gap-2">
-            <h3 className="text-xl">Instructions</h3>
-            <ol className="flex list-decimal flex-col gap-2 pl-5">
-              {data.instructions.map((step, i) => <li key={i}>{step}</li>)}
+          <section className="flex flex-col gap-3">
+            <h3 className="text-lg font-semibold">How to do it</h3>
+            <ol className="flex flex-col gap-4">
+              {data.instructions.map((step, i) => (
+                <li key={i} className="flex gap-3">
+                  {/* left readable: Safari drops list semantics (and so the numbering) from unstyled lists */}
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                    {i + 1}
+                  </span>
+                  <span className="pt-0.5 leading-relaxed">{step}</span>
+                </li>
+              ))}
             </ol>
           </section>
         )}
       </div>
 
       {action && (
-        <div className="sticky bottom-0 border-t-2 border-outline bg-bg p-4">
+        // full-bleed, like the other sticky bars
+        <div className="sticky bottom-0 border-t border-white/10 bg-bg px-(--page-px) pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto max-w-2xl">
             <button
               type="button"
@@ -129,7 +146,7 @@ export default function ExerciseModal({ data, onClose, action, onEdit }: {
                 action.onClick()
                 dialogRef.current?.close()
               }}
-              className="w-full border-2 border-primary bg-primary p-3 text-bg"
+              className={`w-full rounded-2xl bg-primary p-4 font-semibold text-bg hover:cursor-pointer hover:bg-[#ea8692] ${focusRing}`}
             >
               {action.label}
             </button>

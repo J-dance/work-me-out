@@ -5,39 +5,39 @@ import { useCustomExercises, useExercises } from "../context"
 import { loadWorkouts } from "../utils"
 import ExerciseModal from "./ExerciseModal"
 import CustomExerciseForm from "./CustomExerciseForm"
+import { LevelMeter, MuscleChip } from "./ExerciseBits"
 
 /** How many saved workouts use an exercise, read fresh so it's right after edits on the Workouts screen. */
 const workoutsUsing = (exerciseId: string): number =>
   loadWorkouts().filter((w) => w.steps.some((s) => s.type === 'exercise' && s.exerciseId === exerciseId)).length
 
 /**
- * Compact card shown in the exercise list.
+ * Compact card shown in the exercise list: name, what it works and what it needs, and its level.
+ * Category and secondary muscles are left to the details view to keep the list calm.
  */
 const ExerciseCard = ({ data, onSelect }: { data: Exercise, onSelect: () => void }) => {
   return (
-    <article className="relative flex w-full flex-col gap-2 border-2 border-outline p-4 transition-colors motion-reduce:transition-none hover:border-primary has-[button:focus-visible]:border-primary">
-      <h2 className="text-xl wrap-break-word">
-        {/* the ::after overlay makes the whole card clickable while only the name is the button's label */}
-        <button
-          type="button"
-          onClick={onSelect}
-          className="text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
-        >
-          {data.name}
-        </button>
-      </h2>
-      {/* separate flex items: Chrome won't capitalise the first word when it follows an inline badge */}
-      <p className="flex flex-wrap items-center gap-x-2 text-sm opacity-70">
-        {data.custom && <span className="rounded-full bg-tertiary px-2 py-0.5">Yours</span>}
-        <span className="capitalize">
-          {data.level} · {data.category}
-          {data.equipment && ` · ${data.equipment}`}
-        </span>
-      </p>
-      <p className="text-sm capitalize">
-        <span className="sr-only">Primary muscles: </span>
-        {data.primaryMuscles.join(', ')}
-      </p>
+    // the focus ring goes on the card since the button's ::after covers it
+    <article className="relative flex w-full items-center gap-4 rounded-2xl bg-surface px-5 py-4 transition-colors hover:bg-surface-hover has-[button:focus-visible]:outline-3 has-[button:focus-visible]:outline-offset-2 has-[button:focus-visible]:outline-primary motion-reduce:transition-none">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug wrap-break-word">
+          {/* the ::after overlay makes the whole card clickable while only the name is the button's label */}
+          <button
+            type="button"
+            onClick={onSelect}
+            className="min-w-0 text-left after:absolute after:inset-0 after:rounded-2xl after:content-[''] hover:cursor-pointer focus-visible:outline-none"
+          >
+            {data.name}
+          </button>
+          {data.custom && <span className="rounded-full bg-bg/60 px-2 py-0.5 text-xs font-normal text-primary">Yours</span>}
+        </h2>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+          <span className="sr-only">Primary muscles: </span>
+          {data.primaryMuscles.map((m) => <MuscleChip key={m} muscle={m} />)}
+          {data.equipment && <span className="capitalize text-white/75"><span className="sr-only">, equipment: </span>{data.equipment}</span>}
+        </p>
+      </div>
+      <LevelMeter level={data.level} />
     </article>
   )
 }
@@ -68,11 +68,11 @@ const FilterSelect = ({ label, value, options, onChange }: {
   // min-w-0 + w-full: let the grid shrink the select below its longest option instead of overflowing.
   // justify-end keeps the selects in a row lined up when one label wraps onto two lines.
   <label className="flex min-w-0 flex-col justify-end gap-1 text-sm">
-    <span className="opacity-70">{label}</span>
+    <span className="text-white/75">{label}</span>
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full min-w-0 border-2 border-outline bg-bg p-2 capitalize focus:border-primary focus:outline-none"
+      className="w-full min-w-0 rounded-xl border-2 border-outline bg-bg px-3 py-2 capitalize focus:border-primary focus:outline-none"
     >
       <option value="">All</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -100,13 +100,14 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
 
   return (
     // Full-bleed: the negative margin cancels Layout's side padding (--page-px) so the bar spans the whole
-    // viewport width; the inner padding lines the inputs up with the cards below (page padding + the list's sm:px-4).
+    // viewport width; the inner column uses the same padding and max width as the cards below.
     // iOS Safari shows page content under the status bar unless a fixed/sticky element
     // touching the top edge spans the width; then it extends that element's colour there instead.
     <search
-      className="sticky top-0 z-10 -mx-(--page-px) flex w-[calc(100%+2*var(--page-px))] flex-col gap-3 bg-bg px-(--page-px) py-4 sm:px-[calc(var(--page-px)+--spacing(4))]"
+      className="sticky top-0 z-10 -mx-(--page-px) w-[calc(100%+2*var(--page-px))] bg-bg px-(--page-px) py-4"
       aria-label="Filter exercises"
     >
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
       <div className="flex gap-2">
         <input
           type="search"
@@ -114,27 +115,27 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
           placeholder="Search..."
           value={filters.search}
           onChange={(e) => update('search')(e.target.value)}
-          className="w-full min-w-0 border-2 border-outline bg-bg p-2 focus:border-primary focus:outline-none"
+          className="w-full min-w-0 rounded-xl border-2 border-outline bg-bg px-3 py-2 focus:border-primary focus:outline-none"
         />
         <button
           type="button"
           aria-expanded={showFilters}
           aria-controls={gridId}
           onClick={() => setShowFilters((v) => !v)}
-          className={`shrink-0 border-2 px-3 hover:border-primary sm:hidden ${showFilters ? 'border-primary' : 'border-outline'}`}
+          className={`shrink-0 rounded-xl border-2 px-4 hover:border-primary sm:hidden ${showFilters ? 'border-primary bg-surface' : 'border-outline'}`}
         >
           Filters{activeCount > 0 && <span className="text-primary"> ({activeCount})</span>}
         </button>
       </div>
-      {/* columns by available space, not viewport: 4 across when roomy, 2 on phones, 1 on the narrowest screens */}
-      <div id={gridId} className={`${showFilters ? 'grid' : 'hidden'} grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] gap-2 sm:grid`}>
+      {/* an even 2x2 on phones, one row of 4 from sm up */}
+      <div id={gridId} className={`${showFilters ? 'grid' : 'hidden'} grid-cols-2 gap-2 sm:grid sm:grid-cols-4`}>
         <FilterSelect label="Primary muscle" value={filters.muscle} options={options.muscle} onChange={update('muscle')} />
         <FilterSelect label="Level" value={filters.level} options={options.level} onChange={update('level')} />
         <FilterSelect label="Category" value={filters.category} options={options.category} onChange={update('category')} />
         <FilterSelect label="Equipment" value={filters.equipment} options={options.equipment} onChange={update('equipment')} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
-        <span className="opacity-70" aria-hidden="true">
+        <span className="text-white/75" aria-hidden="true">
           {shownCount < resultCount && `Showing ${shownCount} of `}
           {resultCount} exercise{resultCount === 1 ? '' : 's'}
         </span>
@@ -148,6 +149,7 @@ const FilterBar = ({ filters, setFilters, options, resultCount, shownCount }: {
       <span role="status" className="sr-only">
         {resultCount} exercise{resultCount === 1 ? '' : 's'} found
       </span>
+      </div>
     </search>
   )
 }
@@ -220,16 +222,14 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
         resultCount={filtered.length}
         shownCount={visible.length}
       />
-      <div className="w-full sm:px-4">
-        <button
-          type="button"
-          onClick={() => setForm('new')}
-          className="w-full border-2 border-dashed border-outline p-3 hover:border-primary hover:bg-tertiary"
-        >
-          + New exercise
-        </button>
-      </div>
-      <ul className="flex h-full w-full flex-col gap-4 pb-4 sm:px-4">
+      <button
+        type="button"
+        onClick={() => setForm('new')}
+        className="w-full max-w-2xl rounded-2xl border-2 border-dashed border-outline p-4 font-semibold hover:cursor-pointer hover:border-primary hover:bg-surface focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        + New exercise
+      </button>
+      <ul className="flex h-full w-full max-w-2xl flex-col gap-3 pb-4">
         {visible.map((data) => (
           <li key={data.id}>
             <ExerciseCard data={data} onSelect={() => setSelected(data)} />
@@ -237,7 +237,7 @@ export default function Exercises({ setScreen }: { setScreen: (screen: Screen) =
         ))}
         {hasMore && <li ref={sentinelRef} aria-hidden="true" className="h-px" />}
         {filtered.length === 0 && (
-          <li className="text-center opacity-70">No exercises match your filters.</li>
+          <li className="py-6 text-center text-white/75">No exercises match your filters.</li>
         )}
       </ul>
       {selected && (

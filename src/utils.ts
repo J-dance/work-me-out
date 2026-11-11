@@ -1,6 +1,63 @@
-import { useEffect, useRef, useSyncExternalStore } from "react"
-import type { Exercise, Workout } from "./types"
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react"
+import type { BodyArea, Equipment, Exercise, Muscle, Workout, WorkoutStep } from "./types"
 
+/** Which muscles count towards each body area. Matched against an exercise's primary muscles. */
+export const BODY_AREAS: Record<BodyArea, Muscle[]> = {
+  chest: ['chest'],
+  shoulders: ['shoulders', 'neck'],
+  back: ['lats', 'middle back', 'lower back', 'traps'],
+  arms: ['biceps', 'triceps', 'forearms'],
+  core: ['abdominals'],
+  glutes: ['glutes', 'abductors', 'adductors'],
+  legs: ['quadriceps', 'hamstrings', 'calves'],
+}
+
+/** The body area a muscle belongs to, e.g. "lats" → "back". */
+export const areaOf = (muscle: Muscle): BodyArea | undefined =>
+  (Object.keys(BODY_AREAS) as BodyArea[]).find((area) => BODY_AREAS[area].includes(muscle))
+
+/** Equipment chips, most common first. "other" is last as it's a catch-all. */
+export const EQUIPMENT: Equipment[] = [
+  'body only', 'dumbbell', 'barbell', 'kettlebells', 'cable', 'machine', 'bands',
+  'medicine ball', 'exercise ball', 'e-z curl bar', 'foam roll', 'other',
+]
+
+/** Rough time per rep, only used for the estimated total. */
+const SECONDS_PER_REP = 3
+
+/** Estimated workout length in seconds. Timed sets use their duration, rep-only sets are estimated. */
+export const estimateSeconds = (steps: WorkoutStep[]): number => steps.reduce((total, step) => {
+  if (step.type === 'rest') return total + step.duration
+  const perSet = step.duration ?? (step.reps ?? 0) * SECONDS_PER_REP
+  return total + perSet * step.sets + step.restBetweenSets * (step.sets - 1)
+}, 0)
+
+/**
+ * Sizes an element to run from where it starts on the page to the bottom of the visible screen,
+ * so a whole layout fits without scrolling. Re-measures when the window resizes, which includes
+ * mobile browser toolbars showing/hiding. Never shorter than `minHeight`: on very short screens
+ * the element keeps that height and the page scrolls instead of squashing it.
+ * Use with `box-border` padding for any bottom safe-area inset.
+ */
+export const useFillViewport = <T extends HTMLElement>(minHeight: number, bottomGap = 16) => {
+  const ref = useRef<T>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => {
+      // position in the document, so it's the same however far the page is scrolled
+      const top = el.getBoundingClientRect().top + window.scrollY
+      el.style.height = `${Math.max(minHeight, window.innerHeight - top - bottomGap)}px`
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      el.style.height = ''
+    }
+  }, [minHeight, bottomGap])
+  return ref
+}
 
 export class Timer {
   private duration: number

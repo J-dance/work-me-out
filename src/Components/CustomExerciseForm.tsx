@@ -1,23 +1,18 @@
 import { useEffect, useId, useRef, useState } from "react"
-import type { Category, Equipment, Exercise, Level, Muscle } from '../types'
-import { lockScroll, newCustomExerciseId } from "../utils"
+import type { BodyArea, Category, Exercise, Level, Muscle } from '../types'
+import { BODY_AREAS, EQUIPMENT, lockScroll, newCustomExerciseId } from "../utils"
+import { AREA_FILL, fieldLabel, focusRing, iconButton, input, primaryButton, softButton, toggleChip } from "../styles"
+import { LevelBars } from "./ExerciseBits"
 
-const MUSCLES: Muscle[] = [
-  'abdominals', 'abductors', 'adductors', 'biceps', 'calves', 'chest', 'forearms', 'glutes', 'hamstrings',
-  'lats', 'lower back', 'middle back', 'neck', 'quadriceps', 'shoulders', 'traps', 'triceps',
-]
+/** Every muscle, grouped by body area (chest, shoulders, back…) so each colour forms a run. */
+const MUSCLES = (Object.entries(BODY_AREAS) as [BodyArea, Muscle[]][])
+  .flatMap(([area, muscles]) => muscles.map((muscle) => ({ muscle, area })))
 
 const CATEGORIES: Category[] = [
   'strength', 'stretching', 'plyometrics', 'cardio', 'powerlifting', 'olympic weightlifting', 'strongman',
 ]
 
 const LEVELS: Level[] = ['beginner', 'intermediate', 'expert']
-
-/** Most common first; "other" last as it's a catch-all. Same order as the workout builder's chips. */
-const EQUIPMENT: Equipment[] = [
-  'body only', 'dumbbell', 'barbell', 'kettlebells', 'cable', 'machine', 'bands',
-  'medicine ball', 'exercise ball', 'e-z curl bar', 'foam roll', 'other',
-]
 
 /** Starting values for a new custom exercise; any of them can be prefilled, e.g. from the picker's search and filters. */
 export type CustomExerciseDraft = Partial<Pick<Exercise, 'name' | 'equipment' | 'primaryMuscles' | 'category' | 'level'>>
@@ -37,37 +32,63 @@ const fromDraft = (draft: CustomExerciseDraft = {}): Exercise => ({
   custom: true,
 })
 
-const chipClass = (selected: boolean) =>
-  `rounded-full border-2 px-3 py-1 text-sm capitalize ${selected ? 'border-primary bg-tertiary' : 'border-outline hover:border-primary'}`
-
 // text-base (16px): anything smaller makes iOS Safari zoom the page on focus
-const fieldClass = 'w-full min-w-0 border-2 border-outline bg-bg p-2 text-base capitalize focus:border-primary focus:outline-none'
+const fieldClass = `w-full min-w-0 text-base capitalize ${input}`
 
-const MuscleChips = ({ label, value, onChange, disabled = [] }: {
+const MuscleChips = ({ label, value, onChange, disabled = [], secondary = false }: {
   label: string
   value: Muscle[]
   onChange: (value: Muscle[]) => void
   /** Shown but not selectable, e.g. secondary muscles already picked as primary */
   disabled?: Muscle[]
+  /** Secondary muscles fill neutral rather than in their area colour, like in the exercise details */
+  secondary?: boolean
 }) => {
   const id = useId()
   const toggle = (m: Muscle) => onChange(value.includes(m) ? value.filter((v) => v !== m) : [...value, m])
   return (
     <div className="flex flex-col gap-2">
-      <span id={id} className="text-sm opacity-70">{label}</span>
+      <span id={id} className={fieldLabel}>{label}</span>
       <div role="group" aria-labelledby={id} className="flex flex-wrap gap-2">
-        {MUSCLES.map((m) => (
+        {MUSCLES.map(({ muscle: m, area }) => (
           <button
             key={m}
             type="button"
             aria-pressed={value.includes(m)}
             disabled={disabled.includes(m)}
             onClick={() => toggle(m)}
-            className={`${chipClass(value.includes(m))} disabled:opacity-30 disabled:hover:border-outline`}
+            className={`${toggleChip(value.includes(m), secondary ? 'bg-white text-bg' : AREA_FILL[area])} disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent`}
           >
             {m}
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+/** Beginner / intermediate / expert as three toggle buttons, each with its level bars. */
+const LevelPicker = ({ value, onChange }: { value: Level, onChange: (level: Level) => void }) => {
+  const id = useId()
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span id={id} className={fieldLabel}>Level</span>
+      <div role="group" aria-labelledby={id} className="grid grid-cols-3 gap-2">
+        {LEVELS.map((level) => {
+          const selected = value === level
+          return (
+            <button
+              key={level}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(level)}
+              className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 px-2 py-3 text-sm capitalize hover:cursor-pointer ${focusRing} ${selected ? 'border-primary bg-surface font-medium' : 'border-outline hover:bg-surface'}`}
+            >
+              <LevelBars level={level} />
+              {level}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -79,8 +100,8 @@ const Select = <T extends string>({ label, value, options, onChange }: {
   options: T[]
   onChange: (value: T) => void
 }) => (
-  <label className="flex min-w-0 flex-col gap-1 text-sm">
-    <span className="opacity-70">{label}</span>
+  <label className="flex min-w-0 flex-col gap-1.5 text-sm">
+    <span className="text-white/75">{label}</span>
     <select value={value} onChange={(e) => onChange(e.target.value as T)} className={fieldClass}>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -158,21 +179,22 @@ export default function CustomExerciseForm({ initial, draft, onSave, onDelete, u
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
-      <form onSubmit={save} noValidate className="mx-auto flex max-w-2xl flex-col gap-5 p-4 sm:p-6">
+      {/* same side padding and column width as the screens */}
+      <form onSubmit={save} noValidate className="mx-auto flex max-w-[calc(var(--container-2xl)+2*var(--page-px))] flex-col gap-6 px-(--page-px) py-6">
         <header className="flex items-center justify-between gap-4">
-          <h2 id={titleId} className="text-3xl">{initial ? 'Edit exercise' : 'New exercise'}</h2>
+          <h2 id={titleId} className="text-[clamp(1.75rem,7vw,2.25rem)] font-bold leading-tight tracking-tight">{initial ? 'Edit exercise' : 'New exercise'}</h2>
           <button
             type="button"
             onClick={() => dialogRef.current?.close()}
             aria-label="Close without saving"
-            className="shrink-0 border-2 border-outline px-3 py-1 text-xl hover:border-primary"
+            className={`size-10 ${iconButton}`}
           >
             <span aria-hidden="true">✕</span>
           </button>
         </header>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="opacity-70">Name</span>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-white/75">Name</span>
           <input
             ref={nameRef}
             type="text"
@@ -180,26 +202,29 @@ export default function CustomExerciseForm({ initial, draft, onSave, onDelete, u
             onChange={(e) => set('name')(e.target.value)}
             aria-invalid={triedSave && !name}
             autoComplete="off"
-            className={`${fieldClass} normal-case`}
+            className={`${fieldClass} text-lg font-semibold normal-case aria-invalid:border-primary`}
           />
         </label>
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <Select label="Equipment" value={exercise.equipment ?? 'body only'} options={EQUIPMENT} onChange={set('equipment')} />
           <Select label="Category" value={exercise.category} options={CATEGORIES} onChange={set('category')} />
-          <Select label="Level" value={exercise.level} options={LEVELS} onChange={set('level')} />
         </div>
 
-        <MuscleChips label="Primary muscles" value={exercise.primaryMuscles} onChange={set('primaryMuscles')} />
+        <LevelPicker value={exercise.level} onChange={set('level')} />
+
+        {/* same wording as the exercise details: "Main" muscles in colour, "Also works" in grey */}
+        <MuscleChips label="Main muscles" value={exercise.primaryMuscles} onChange={set('primaryMuscles')} />
         <MuscleChips
-          label="Secondary muscles (optional)"
+          label="Also works (optional)"
           value={exercise.secondaryMuscles}
           onChange={set('secondaryMuscles')}
           disabled={exercise.primaryMuscles}
+          secondary
         />
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="opacity-70">Instructions (optional, one step per line)</span>
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-white/75">How to do it (optional, one step per line)</span>
           <textarea
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
@@ -208,20 +233,20 @@ export default function CustomExerciseForm({ initial, draft, onSave, onDelete, u
           />
         </label>
 
-        {/* always rendered so screen readers pick up the message when it appears */}
-        <p role="status" className="text-primary">{triedSave && problems.join('. ')}</p>
+        {/* always rendered so screen readers pick up the message when it appears; when empty, the negative margin cancels its gap */}
+        <p role="status" className="text-primary empty:-mt-6">{triedSave && problems.join('. ')}</p>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <button type="submit" className="border-2 border-primary bg-primary px-4 py-2 text-bg">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex gap-3">
+            <button type="submit" className={primaryButton}>
               Save
             </button>
-            <button type="button" onClick={() => dialogRef.current?.close()} className="border-2 border-outline px-4 py-2 hover:border-primary">
+            <button type="button" onClick={() => dialogRef.current?.close()} className={softButton}>
               Cancel
             </button>
           </div>
           {initial && onDelete && (
-            <button type="button" onClick={remove} className="underline hover:text-primary">
+            <button type="button" onClick={remove} className="rounded-full px-3 py-2 text-sm underline hover:cursor-pointer hover:text-primary">
               Delete exercise
             </button>
           )}

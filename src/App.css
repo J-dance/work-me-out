@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* short:* applies on short screens (e.g. iPhone SE with Safari's toolbars), to squeeze full-height layouts */
+@custom-variant short (@media (max-height: 700px));
+
 @theme {
   --color-bg: #1f2041;
   /* contrast (WCAG AA): 4.7:1 on bg, and bg-coloured text on it is 4.7:1. Was #e05263 (4.1:1). */
@@ -9,6 +12,34 @@
   /* borders of inputs/buttons need 3:1 against bg; tertiary is only 1.7:1, so it is kept for fills */
   --color-outline: #7a6aad;
   --color-white: #e8e9f3;
+  /* card fill, lifted just off bg so cards read as soft panels without needing a border */
+  --color-surface: #2a2b55;
+  /* hover for surface cards with area chips: the lightest step that keeps every chip at 4.5:1 or more */
+  --color-surface-hover: #323363;
+
+  /* body-area colours: soft pastels used as text on a 15% tint of themselves (chips).
+     On surface every chip is 5.1:1 or better; on surface-hover 4.57:1 or better (AA) */
+  --color-area-chest: #f4a6b4;
+  --color-area-shoulders: #f6c88f;
+  --color-area-back: #9ec5f8;
+  --color-area-arms: #c9b3f5;
+  --color-area-core: #8fd9c9;
+  --color-area-glutes: #f5a8d8;
+  --color-area-legs: #b2dfa6;
+
+  /* rounded system font: SF Pro Rounded on Apple devices, plain system UI elsewhere. Nothing to download, so it works offline */
+  --font-sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* --page-px is the side padding used by every screen. Full-bleed children (Exercises' sticky filter bar)
+   read it to cancel it out. Tighter on small phones so content isn't squeezed by 48px of gutter. */
+:root {
+  --page-px: 1rem;
+}
+@media (width >= 40rem) {
+  :root {
+    --page-px: 1.5rem;
+  }
 }
 
 /* the app is dark-only: tell the browser so native controls (select popups, scrollbars,
@@ -16,6 +47,9 @@
 :root {
   color-scheme: dark;
   background-color: var(--color-bg);
+  /* always reserve the scrollbar's space (desktop browsers with classic scrollbars), so the centred
+     column doesn't jump sideways between short screens (menu) and long ones (exercises) */
+  scrollbar-gutter: stable;
 }
 
 /* stop pull-to-refresh / overscroll navigation when scrolling past the top of the page.

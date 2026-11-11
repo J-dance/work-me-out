@@ -62,7 +62,7 @@ export default class ScreenErrorBoundary extends Component<Props, State> {
     const loadFailed = error instanceof ExercisesLoadError
 
     return (
-      <main role="alert" className="flex flex-col items-center gap-4 p-6 text-center">
+      <main role="alert" className="flex flex-col items-center gap-4 px-(--page-px) py-6 text-center">
         <h1 className="text-2xl">{loadFailed ? "Couldn't load exercises" : "Something went wrong"}</h1>
         {loadFailed
           ? <LoadFailedHelp />

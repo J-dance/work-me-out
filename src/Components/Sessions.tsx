@@ -1,11 +1,14 @@
 import Layout from "./Layout";
 import type { Exercise, Screen, Workout } from "../types";
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
-import { formatDuration, loadWorkouts, playBeep, speakDuration, Timer, unlockAudio, useFocusOnChange, useWakeLock } from "../utils";
+import { formatDuration, loadWorkouts, playBeep, speakDuration, Timer, unlockAudio, useFillViewport, useFocusOnChange, useWakeLock } from "../utils";
 import { useExercises } from "../context";
 import ExerciseImage from "./ExerciseImage";
 import ExerciseModal from "./ExerciseModal";
 import { InfoButton } from "./Buttons";
+import { MuscleChip } from "./ExerciseBits";
+import WorkoutCard from "./WorkoutCard";
+import { card, fieldLabel, focusRing, iconButton, primaryButton, softButton, softButtonOnCard } from "../styles";
 
 /** One thing to do during a session: a single set of an exercise, or a rest. */
 type Phase =
@@ -85,7 +88,7 @@ export default function Session({ setScreen }: { setScreen: (screen: Screen) => 
   const [workout, setWorkout] = useState<Workout | null>(null)
 
   return (
-    <Layout setScreen={setScreen} title={"Lets Go!"}>{
+    <Layout setScreen={setScreen} title="Let's go">{
       <section className="flex w-full max-w-2xl grow flex-col gap-4">
         {
           workout ?
@@ -96,6 +99,9 @@ export default function Session({ setScreen }: { setScreen: (screen: Screen) => 
     }</Layout>
   )
 }
+
+/** Shortest the session view gets before the page scrolls instead (small phones in landscape, etc.). */
+const MIN_SESSION_HEIGHT = 380
 
 function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () => void }) {
   const exercises = useExercises()
@@ -109,6 +115,8 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
 
   const timerRef = useRef<Timer | null>(null)
   const headingRef = useFocusOnChange<HTMLHeadingElement>()
+  // the whole session (minus the page footer) fits the screen; below this height it scrolls instead
+  const fillRef = useFillViewport<HTMLDivElement>(MIN_SESSION_HEIGHT)
   // keep the screen on while the workout is running, so the phone locking doesn't pause the timer
   useWakeLock(status === 'running')
 
@@ -151,9 +159,9 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
   if (phases.length === 0) {
     return (
       <>
-        <h2 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">{workout.name}</h2>
-        <p className="opacity-70">This workout has no exercises yet. Add some on the Workouts screen.</p>
-        <button type="button" onClick={onExit} className="self-start underline hover:text-primary">Choose another workout</button>
+        <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold wrap-break-word focus:outline-none">{workout.name}</h2>
+        <p className="text-white/75">This workout has no exercises yet. Add some on the Workouts screen.</p>
+        <button type="button" onClick={onExit} className={`self-start ${softButton}`}>Choose another workout</button>
       </>
     )
   }
@@ -195,16 +203,17 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
     : status === 'ready' ? '' : `${status === 'paused' ? 'Paused. ' : ''}${announcePhase(phase)}`
 
   return (
-    <>
+    // fills the screen height; the current-step card takes up whatever space is left
+    <div ref={fillRef} className="box-border flex flex-col gap-3 pb-[env(safe-area-inset-bottom)] short:gap-2">
       {/* wraps so "Change workout" drops under a long name on narrow screens instead of running off the edge */}
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 ref={headingRef} tabIndex={-1} className="min-w-0 text-2xl wrap-break-word focus:outline-none sm:text-3xl">{workout.name}</h2>
-        <button type="button" onClick={onExit} className="shrink-0 text-sm underline hover:text-primary">Change workout</button>
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2 ref={headingRef} tabIndex={-1} className="min-w-0 text-lg font-semibold leading-snug wrap-break-word focus:outline-none">{workout.name}</h2>
+        <button type="button" onClick={onExit} className={`shrink-0 rounded-full bg-surface px-3 py-1 text-sm hover:cursor-pointer hover:bg-tertiary ${focusRing}`}>Change workout</button>
       </header>
 
       {/* Progress bar */}
       <div
-        className="h-2 w-full bg-tertiary"
+        className="h-2 w-full shrink-0 overflow-hidden rounded-full bg-surface"
         role="progressbar"
         aria-label="Workout progress"
         aria-valuemin={0}
@@ -212,7 +221,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
         aria-valuenow={index}
         aria-valuetext={`${index} of ${phases.length} steps complete`}
       >
-        <div className="h-full bg-primary transition-all motion-reduce:transition-none" style={{ width: `${(index / phases.length) * 100}%` }} />
+        <div className="h-full rounded-full bg-primary transition-all motion-reduce:transition-none" style={{ width: `${(index / phases.length) * 100}%` }} />
       </div>
 
       <p role="status" className="sr-only">{announcement}</p>
@@ -223,20 +232,21 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
         <>
           <CurrentPhase phase={phase} remaining={remaining} status={status} onInfo={setInfo} />
 
-          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Session controls">
+          {/* main action wider and filled, Back/Skip as soft pills either side */}
+          <div className="grid shrink-0 grid-cols-[1fr_1.4fr_1fr] gap-3" role="group" aria-label="Session controls">
             <button
               type="button"
               onClick={() => goTo(index - 1, status === 'ready' ? 'ready' : 'running')}
               disabled={index === 0}
               aria-label="Previous step"
-              className="border-2 border-outline px-1 py-3 hover:bg-tertiary sm:p-3 disabled:opacity-40 disabled:hover:bg-transparent"
+              className={`${softButton} px-2 py-3 short:py-2.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-surface`}
             >Back</button>
-            <button type="button" onClick={primary.onClick} className="border-2 border-primary px-1 py-3 hover:bg-primary hover:text-bg sm:p-3">{primary.label}</button>
+            <button type="button" onClick={primary.onClick} className={`${primaryButton} px-2 py-3 text-lg short:py-2.5`}>{primary.label}</button>
             <button
               type="button"
               aria-label="Skip step"
               onClick={() => goTo(index + 1, status === 'ready' ? 'ready' : status)}
-              className="border-2 border-outline px-1 py-3 hover:bg-tertiary sm:p-3"
+              className={`${softButton} px-2 py-3 short:py-2.5`}
             >Skip</button>
           </div>
 
@@ -246,7 +256,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
 
       {/* lives here rather than in CurrentPhase, so it stays open if the timer moves on to a rest */}
       {info && <ExerciseModal data={info} onClose={() => setInfo(null)} />}
-    </>
+    </div>
   )
 }
 
@@ -260,7 +270,7 @@ function CurrentPhase({ phase, remaining, status, onInfo }: {
 }) {
   const clock = remaining !== null && (
     // role="timer" is not live by default, so it doesn't announce every second
-    <p role="timer" aria-label="Time remaining" className={`text-6xl tabular-nums select-none ${status === 'paused' ? 'opacity-50' : ''}`}>
+    <p role="timer" aria-label="Time remaining" className={`text-6xl leading-none font-bold sm:text-7xl tracking-tight tabular-nums select-none ${status === 'paused' ? 'opacity-50' : ''}`}>
       <span aria-hidden="true">{formatDuration(remaining)}</span>
       <span className="sr-only">{speakDuration(remaining)}{status === 'paused' ? ', paused' : ''}</span>
     </p>
@@ -268,9 +278,10 @@ function CurrentPhase({ phase, remaining, status, onInfo }: {
 
   if (phase.kind === 'rest') {
     return (
-      <div className="flex flex-col items-center gap-2 border-2 border-dashed border-secondary p-4 text-center sm:p-6">
-        <p className="text-sm uppercase tracking-wide opacity-70">{phase.label}</p>
-        <h3 className="text-3xl">Rest</h3>
+      // same soft green as rest steps in the workout editor
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-secondary bg-secondary/15 px-5 py-6 text-center">
+        <p className={fieldLabel}>{phase.label}</p>
+        <h3 className="text-3xl font-bold">Breathe</h3>
         {clock}
       </div>
     )
@@ -280,27 +291,36 @@ function CurrentPhase({ phase, remaining, status, onInfo }: {
   // the data has up to two images (start and end position), shown side by side
   const images = exercise?.images.slice(0, 2) ?? []
   return (
-    <div className="flex flex-col items-center gap-2 border-2 border-primary p-4 text-center sm:p-6">
-      <p className="text-sm uppercase tracking-wide opacity-70">Set {phase.set} of {phase.sets}</p>
+    // grows to fill the space left on screen; the photos are the part that stretches or shrinks
+    <div className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-3 ${card} px-4 py-4 text-center sm:px-5 short:gap-2 short:py-3`}>
+      <p className="rounded-full bg-primary/15 px-3 py-1 text-sm font-medium text-primary">Set {phase.set} of {phase.sets}</p>
       <div className="flex max-w-full items-center justify-center gap-2">
-        <h3 className="min-w-0 text-2xl wrap-break-word sm:text-3xl">{phase.name}</h3>
-        {exercise && <InfoButton onClick={() => onInfo(exercise)} label={phase.name} className="border-2 border-outline px-2 text-xl hover:border-primary" />}
+        <h3 className="min-w-0 text-xl font-bold leading-tight tracking-tight text-balance wrap-break-word sm:text-3xl">{phase.name}</h3>
+        {exercise && <InfoButton onClick={() => onInfo(exercise)} label={phase.name} className={`size-9 bg-bg/60 ${iconButton}`} />}
       </div>
+      {exercise && exercise.primaryMuscles.length > 0 && (
+        // dropped on short screens to make room; still in the exercise details
+        <p className="flex flex-wrap justify-center gap-2 short:hidden">
+          <span className="sr-only">Works </span>
+          {exercise.primaryMuscles.map((m) => <MuscleChip key={m} muscle={m} size="md" />)}
+        </p>
+      )}
       {images.length > 0 && (
-        <div className={`grid w-full gap-2 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        // min-h-16: if there's barely any room, keep a sliver rather than letting them vanish
+        <div className={`grid min-h-16 w-full max-h-80 flex-1 grid-rows-[minmax(0,1fr)] gap-2 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {images.map((src, i) => (
             <ExerciseImage
               key={src}
               src={src}
               alt={`${phase.name} demonstration, ${i + 1} of ${images.length}`}
-              className="mx-auto max-h-48 w-full rounded object-contain"
+              className="h-full min-h-0 w-full rounded-xl object-contain"
             />
           ))}
         </div>
       )}
-      {phase.reps !== null && <p className="text-2xl">{phase.reps} reps</p>}
+      {phase.reps !== null && <p className="text-3xl font-bold">{phase.reps} <span className="text-xl font-normal text-white/75">reps</span></p>}
       {clock}
-      {status === 'running' && phase.duration === null && <p className="text-sm opacity-70">Press Done when you finish the set</p>}
+      {status === 'running' && phase.duration === null && <p className="text-sm text-white/75">Press Done when you finish the set</p>}
     </div>
   )
 }
@@ -309,17 +329,20 @@ function CurrentPhase({ phase, remaining, status, onInfo }: {
 function UpNext({ next, then }: { next: Phase | undefined, then: Phase | undefined }) {
   const headingId = useId()
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-1 border-2 border-outline p-3">
-      <h3 id={headingId} className="text-sm opacity-70">Up next</h3>
+    <section aria-labelledby={headingId} className={`flex shrink-0 flex-col gap-0.5 ${card} px-5 py-3 short:py-2`}>
+      <h3 id={headingId} className={fieldLabel}>Up next</h3>
       {!next ? (
-        <p>Finish!</p>
+        <p className="font-semibold">Finish!</p>
       ) : next.kind === 'rest' ? (
         <>
-          <p>{next.label} · {formatDuration(next.duration)}</p>
-          {then?.kind === 'work' && <p className="text-sm opacity-70">then {then.name} · set {then.set} of {then.sets}</p>}
+          <p className="font-semibold">{next.label} · {formatDuration(next.duration)}</p>
+          {then?.kind === 'work' && <p className="text-sm text-white/75 short:hidden">then {then.name} · set {then.set} of {then.sets}</p>}
         </>
       ) : (
-        <p>{next.name} · set {next.set} of {next.sets}{describeWork(next) && ` · ${describeWork(next)}`}</p>
+        <p>
+          <span className="font-semibold">{next.name}</span>
+          <span className="text-white/75"> · set {next.set} of {next.sets}{describeWork(next) && ` · ${describeWork(next)}`}</span>
+        </p>
       )}
     </section>
   )
@@ -329,60 +352,38 @@ function UpNext({ next, then }: { next: Phase | undefined, then: Phase | undefin
 function WorkoutComplete({ onRestart, onExit }: { onRestart: () => void, onExit: () => void }) {
   const headingRef = useFocusOnChange<HTMLHeadingElement>()
   return (
-    <div className="flex flex-col items-center gap-4 border-2 border-outline p-4 text-center sm:p-6">
-      <h3 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">Workout complete!</h3>
-      <p className="opacity-70">Nice work.</p>
-      <div className="flex flex-wrap justify-center gap-2">
-        <button type="button" onClick={onRestart} className="border-2 border-outline px-4 py-2 hover:bg-tertiary">Restart</button>
-        <button type="button" onClick={onExit} className="border-2 border-outline px-4 py-2 hover:bg-tertiary">Choose another</button>
+    <div className={`flex flex-1 flex-col items-center justify-center gap-4 ${card} px-5 py-10 text-center`}>
+      <span aria-hidden="true" className="grid size-16 place-items-center rounded-full bg-primary/15 text-3xl text-primary">✓</span>
+      <h3 ref={headingRef} tabIndex={-1} className="text-2xl font-bold focus:outline-none sm:text-3xl">Workout complete!</h3>
+      <p className="text-white/75">Nice work.</p>
+      <div className="mt-2 flex flex-wrap justify-center gap-3">
+        <button type="button" onClick={onExit} className={primaryButton}>Choose another</button>
+        <button type="button" onClick={onRestart} className={softButtonOnCard}>Restart</button>
       </div>
     </div>
   )
 }
 
+/** Pick a saved workout. Tapping one opens it ready to start; nothing runs until Start is pressed. */
 function SelectWorkout({ setWorkout, setScreen }: { setWorkout: (workout: Workout) => void, setScreen: (screen: Screen) => void }) {
   const [workouts] = useState<Workout[]>(loadWorkouts)
-  const [selectedId, setSelectedId] = useState('')
   const headingRef = useFocusOnChange<HTMLHeadingElement>()
-  const selected = workouts.find((w) => w.id === selectedId)
-
-  if (workouts.length === 0) {
-    return (
-      <>
-        <h2 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">Select a workout</h2>
-        <p className="opacity-70">You don't have any saved workouts yet.</p>
-        <button type="button" onClick={() => setScreen('workouts')} className="self-start border-2 border-outline px-4 py-2 hover:bg-tertiary">Build a workout</button>
-      </>
-    )
-  }
 
   return (
     <>
-      <h2 ref={headingRef} tabIndex={-1} className="text-2xl focus:outline-none sm:text-3xl">
-        <label htmlFor="workout-select">Select a workout</label>
-      </h2>
-      <select
-        name="workouts"
-        id="workout-select"
-        value={selectedId}
-        className="w-full border-2 border-outline bg-bg p-2 text-xl focus:border-primary focus:outline-none"
-        onChange={(e) => setSelectedId(e.target.value)}
-      >
-        <option value="" disabled>Choose a workout…</option>
-        {
-          workouts.map((workout) => (
-            <option key={workout.id} value={workout.id}>{workout.name || 'Untitled workout'}</option>
-          ))
-        }
-      </select>
-      <button
-        type="button"
-        disabled={!selected}
-        onClick={() => { if (selected) setWorkout(selected) }}
-        className="border-2 border-primary p-3 text-xl hover:bg-primary hover:text-bg disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-white"
-      >
-        Start workout
-      </button>
+      <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold focus:outline-none">Select a workout</h2>
+      {workouts.length === 0 ? (
+        <div className={`flex flex-col items-start gap-4 ${card} px-5 py-6`}>
+          <p className="text-white/75">You don't have any saved workouts yet.</p>
+          <button type="button" onClick={() => setScreen('workouts')} className={primaryButton}>Build a workout</button>
+        </div>
+      ) : (
+        <ul className="flex w-full flex-col gap-3">
+          {workouts.map((workout) => (
+            <WorkoutCard key={workout.id} workout={workout} actionLabel="Open" headingLevel="h3" onSelect={() => setWorkout(workout)} />
+          ))}
+        </ul>
+      )}
     </>
   )
 }

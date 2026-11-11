@@ -2,18 +2,18 @@ import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "r
 import Layout from "./Layout"
 import type { Screen, Exercise, Workout, WorkoutStep, ExerciseStep, RestStep, BodyArea, Muscle, Equipment } from '../types'
 import { useCustomExercises, useExercises } from "../context"
-import { cacheImages, formatDuration, loadWorkouts, lockScroll, saveWorkouts, speakDuration, uid } from "../utils"
+import { BODY_AREAS, EQUIPMENT, cacheImages, estimateSeconds, formatDuration, loadWorkouts, lockScroll, saveWorkouts, speakDuration, uid } from "../utils"
 import ExerciseModal from "./ExerciseModal"
 import CustomExerciseForm, { type CustomExerciseDraft } from "./CustomExerciseForm"
 import { InfoButton } from "./Buttons"
 import { imgBase } from "./ExerciseProvider"
 import { DataNote } from "./Notices"
+import { MuscleChip } from "./ExerciseBits"
+import WorkoutCard from "./WorkoutCard"
+import { AREA_FILL, card, dashedButton, fieldLabel, focusRing, iconButton, input, primaryButton, softButton, toggleChip } from "../styles"
 
 /** Gap between list items in px. Must match the `gap-3` on the step list. */
 const LIST_GAP = 12
-
-/** Rough time per rep, only used for the estimated total. */
-const SECONDS_PER_REP = 3
 
 /** Max exercises shown in the picker at once, keeps the list fast. */
 const PICKER_LIMIT = 50
@@ -26,24 +26,7 @@ const newRestStep = (): RestStep => ({ type: 'rest', key: uid(), duration: 60 })
 
 const newWorkout = (): Workout => ({ id: uid(), name: '', bodyAreas: [], muscles: [], equipment: [], steps: [] })
 
-/** Which muscles count towards each body area. Matched against an exercise's primary muscles. */
-const BODY_AREAS: Record<BodyArea, Muscle[]> = {
-  chest: ['chest'],
-  shoulders: ['shoulders', 'neck'],
-  back: ['lats', 'middle back', 'lower back', 'traps'],
-  arms: ['biceps', 'triceps', 'forearms'],
-  core: ['abdominals'],
-  glutes: ['glutes', 'abductors', 'adductors'],
-  legs: ['quadriceps', 'hamstrings', 'calves'],
-}
-
 const bodyAreaNames = Object.keys(BODY_AREAS) as BodyArea[]
-
-/** Equipment chips, most common first. "other" is last as it's a catch-all. */
-const EQUIPMENT: Equipment[] = [
-  'body only', 'dumbbell', 'barbell', 'kettlebells', 'cable', 'machine', 'bands',
-  'medicine ball', 'exercise ball', 'e-z curl bar', 'foam roll', 'other',
-]
 
 /** What the workout targets: equipment, broad areas, and optionally specific muscles within those areas. */
 type Focus = { equipment: Equipment[], areas: BodyArea[], muscles: Muscle[] }
@@ -75,19 +58,6 @@ const filterByFocus = (exercises: Exercise[], { equipment, areas, muscles }: Foc
   )
 }
 
-/** e.g. "Back (lats, traps), Legs · Dumbbell, Bands" */
-const describeFocus = ({ equipment, areas, muscles }: Focus): string => {
-  const areaText = bodyAreaNames.filter((a) => areas.includes(a)).map((area) => {
-    const chosen = BODY_AREAS[area].filter((m) => muscles.includes(m))
-    return chosen.length > 0 ? `${area} (${chosen.join(', ')})` : area
-  }).join(', ')
-  const equipmentText = EQUIPMENT.filter((e) => equipment.includes(e)).join(', ')
-  return [areaText, equipmentText].filter(Boolean).join(' · ')
-}
-
-const chipClass = (selected: boolean) =>
-  `rounded-full border-2 px-3 py-1 text-sm capitalize ${selected ? 'border-primary bg-tertiary' : 'border-outline hover:border-primary'}`
-
 /**
  * Toggleable chips for picking equipment and body areas, then optionally specific muscles within those areas.
  * The muscle row only lists areas that have more than one muscle to choose between.
@@ -116,38 +86,38 @@ const FocusSelect = ({ value, onChange }: { value: Focus, onChange: React.Dispat
   // keep the area order fixed rather than the order they were tapped
   const muscleOptions = bodyAreaNames
     .filter((a) => value.areas.includes(a) && BODY_AREAS[a].length > 1)
-    .flatMap((a) => BODY_AREAS[a])
+    .flatMap((area) => BODY_AREAS[area].map((muscle) => ({ muscle, area })))
 
   return (
     <div className="flex flex-col gap-2">
-      <span id={`${id}-equipment`} className="text-sm opacity-70">Equipment</span>
+      <span id={`${id}-equipment`} className={fieldLabel}>Equipment</span>
       <div role="group" aria-labelledby={`${id}-equipment`} className="flex flex-wrap gap-2">
         {EQUIPMENT.map((item) => (
-          <button key={item} type="button" aria-pressed={value.equipment.includes(item)} onClick={() => toggleEquipment(item)} className={chipClass(value.equipment.includes(item))}>
+          <button key={item} type="button" aria-pressed={value.equipment.includes(item)} onClick={() => toggleEquipment(item)} className={toggleChip(value.equipment.includes(item))}>
             {item}
           </button>
         ))}
       </div>
-      <span id={`${id}-areas`} className="mt-1 text-sm opacity-70">Body areas</span>
+      <span id={`${id}-areas`} className={`mt-2 ${fieldLabel}`}>Body areas</span>
       <div role="group" aria-labelledby={`${id}-areas`} className="flex flex-wrap gap-2">
         {bodyAreaNames.map((area) => (
-          <button key={area} type="button" aria-pressed={value.areas.includes(area)} onClick={() => toggleArea(area)} className={chipClass(value.areas.includes(area))}>
+          <button key={area} type="button" aria-pressed={value.areas.includes(area)} onClick={() => toggleArea(area)} className={toggleChip(value.areas.includes(area), AREA_FILL[area])}>
             {area}
           </button>
         ))}
       </div>
       {muscleOptions.length > 0 && (
-        <div role="group" aria-labelledby={`${id}-muscles`} className="flex flex-wrap items-center gap-2 border-l-2 border-outline pl-3">
-          <span id={`${id}-muscles`} className="text-sm opacity-70">Muscles:</span>
-          {muscleOptions.map((muscle) => (
-            <button key={muscle} type="button" aria-pressed={value.muscles.includes(muscle)} onClick={() => toggleMuscle(muscle)} className={chipClass(value.muscles.includes(muscle))}>
+        <div role="group" aria-labelledby={`${id}-muscles`} className="mt-1 flex flex-wrap items-center gap-2 rounded-2xl bg-surface p-3">
+          <span id={`${id}-muscles`} className={fieldLabel}>Muscles:</span>
+          {muscleOptions.map(({ muscle, area }) => (
+            <button key={muscle} type="button" aria-pressed={value.muscles.includes(muscle)} onClick={() => toggleMuscle(muscle)} className={toggleChip(value.muscles.includes(muscle), AREA_FILL[area])}>
               {muscle}
             </button>
           ))}
         </div>
       )}
       {hasFilters && (
-        <button type="button" onClick={() => onChange(emptyFocus)} className="self-start text-sm underline hover:text-primary">
+        <button type="button" onClick={() => onChange(emptyFocus)} className="mt-1 self-start text-sm underline hover:text-primary">
           Clear filters
         </button>
       )}
@@ -164,13 +134,6 @@ const draftFromPicker = (search: string, { equipment, areas, muscles }: Focus): 
   equipment: equipment.length === 1 ? equipment[0] : undefined,
   primaryMuscles: [...new Set([...muscles, ...areas.filter((a) => BODY_AREAS[a].length === 1).flatMap((a) => BODY_AREAS[a])])],
 })
-
-/** Estimated workout length in seconds. Timed sets use their duration, rep-only sets are estimated. */
-const estimateSeconds = (steps: WorkoutStep[]): number => steps.reduce((total, step) => {
-  if (step.type === 'rest') return total + step.duration
-  const perSet = step.duration ?? (step.reps ?? 0) * SECONDS_PER_REP
-  return total + perSet * step.sets + step.restBetweenSets * (step.sets - 1)
-}, 0)
 
 /** An exercise step needs at least reps or a time to be doable. */
 const isStepValid = (step: WorkoutStep): boolean =>
@@ -220,11 +183,11 @@ const NumberField = ({ label, value, onChange, min = 0, max, optional = false, s
 
   return (
     <label className="flex min-w-0 flex-col gap-1 text-sm">
-      <span className="opacity-70">
+      <span className="text-white/75">
         {label}
         {suffix && <span className="sr-only"> ({suffix === 's' ? 'seconds' : suffix})</span>}
       </span>
-      <span className="flex items-center border-2 border-outline focus-within:border-primary">
+      <span className="flex items-center overflow-hidden rounded-xl border-2 border-outline bg-bg focus-within:border-primary">
         {/* type="text" + inputMode: same numeric keypad on phones, but no desktop spinners,
             no scroll-wheel changes, and Firefox can't accept letters. Range is checked in handleChange. */}
         <input
@@ -237,9 +200,9 @@ const NumberField = ({ label, value, onChange, min = 0, max, optional = false, s
           onChange={(e) => handleChange(e.target.value)}
           onBlur={() => setText(value?.toString() ?? '')}
           // text-base (16px): anything smaller makes iOS Safari zoom the page on focus
-          className="w-full min-w-0 bg-bg p-2 text-base focus:outline-none"
+          className="w-full min-w-0 bg-bg px-3 py-2 text-base focus:outline-none"
         />
-        {suffix && <span aria-hidden="true" className="pr-2 opacity-70">{suffix}</span>}
+        {suffix && <span aria-hidden="true" className="pr-3 text-white/75">{suffix}</span>}
       </span>
     </label>
   )
@@ -263,7 +226,7 @@ const DragHandle = ({ handleProps, label }: { handleProps: HandleProps, label: s
     aria-label={`Reorder ${label}`}
     aria-description="Use the up and down arrow keys to move"
     data-drag-handle
-    className="flex shrink-0 cursor-grab touch-none items-center self-stretch px-1 text-xl sm:px-2 opacity-60 hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
+    className={`flex shrink-0 cursor-grab touch-none items-center self-stretch rounded-lg px-1 text-xl text-white/60 hover:text-white focus-visible:text-white active:cursor-grabbing sm:px-2 ${focusRing}`}
     {...handleProps}
   >
     <span aria-hidden="true">⠿</span>
@@ -275,7 +238,7 @@ const RemoveButton = ({ onClick, label }: { onClick: () => void, label: string }
     type="button"
     onClick={onClick}
     aria-label={`Remove ${label}`}
-    className="shrink-0 self-start border-2 border-outline px-2 hover:border-primary"
+    className={`size-9 self-start bg-bg/60 text-sm ${iconButton}`}
   >
     <span aria-hidden="true">✕</span>
   </button>
@@ -294,16 +257,16 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
   const update = <K extends keyof ExerciseStep>(key: K) => (value: ExerciseStep[K]) => onChange({ ...step, [key]: value })
 
   return (
-    <div className="flex gap-1 border-2 border-outline bg-bg p-2 sm:gap-2 sm:p-3">
+    <div className={`flex gap-1 ${card} p-3 sm:gap-2 sm:p-4`}>
       <DragHandle handleProps={handleProps} label={name} />
       <div className="flex min-w-0 grow flex-col gap-3">
         <header className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="text-lg wrap-break-word">{name}</h3>
-            <p className="text-sm opacity-70">{describeSets(step)}</p>
+            <h3 className="font-semibold leading-snug wrap-break-word">{name}</h3>
+            <p className="text-sm text-white/75">{describeSets(step)}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {exercise && <InfoButton onClick={onInfo} label={name} className="border-2 border-outline px-2 hover:border-primary" />}
+            {exercise && <InfoButton onClick={onInfo} label={name} className={`size-9 bg-bg/60 ${iconButton}`} />}
             <RemoveButton onClick={onRemove} label={name} />
           </div>
         </header>
@@ -326,7 +289,7 @@ const ExerciseStepCard = ({ step, exercise, onChange, onRemove, onAddRestAfter, 
           <span role="status" className="text-primary">
             {!isStepValid(step) && `${name}: set reps and/or time`}
           </span>
-          <button type="button" onClick={onAddRestAfter} aria-label={`Add rest after ${name}`} className="underline hover:text-primary">
+          <button type="button" onClick={onAddRestAfter} aria-label={`Add rest after ${name}`} className={`rounded-full bg-bg/60 px-3 py-1 hover:cursor-pointer hover:bg-tertiary ${focusRing}`}>
             + Rest after
           </button>
         </div>
@@ -342,11 +305,11 @@ const RestStepCard = ({ step, label, onChange, onRemove, handleProps }: {
   onRemove: () => void
   handleProps: HandleProps
 }) => (
-  <div className="flex items-center gap-1 border-2 border-dashed border-secondary bg-bg p-2 sm:gap-2 sm:p-3">
+  <div className="flex items-center gap-1 rounded-2xl border-2 border-dashed border-secondary bg-secondary/15 p-3 sm:gap-2 sm:p-4">
     <DragHandle handleProps={handleProps} label={label} />
     {/* on mini screens the duration field wraps under the title instead of crushing it */}
     <div className="flex min-w-0 grow flex-wrap items-center gap-x-2 gap-y-1">
-      <h3 className="grow whitespace-nowrap">
+      <h3 className="grow whitespace-nowrap font-semibold">
         <span aria-hidden="true">Rest · {formatDuration(step.duration)}</span>
         <span className="sr-only">Rest, {speakDuration(step.duration)}</span>
       </h3>
@@ -468,7 +431,7 @@ const StepList = ({ steps, setSteps, exercisesById }: {
     return (
       <>
         {liveRegion}
-        <p className="py-8 text-center opacity-70">No exercises yet. Add one below.</p>
+        <p className="py-8 text-center text-white/75">No exercises yet. Add one below.</p>
       </>
     )
   }
@@ -492,7 +455,7 @@ const StepList = ({ steps, setSteps, exercisesById }: {
                 // only animate the items making room; no transitions on drop so nothing jumps
                 transition: drag && !isDragged ? 'transform 150ms ease' : 'none',
               }}
-              className={isDragged ? 'relative z-10 opacity-90 shadow-lg shadow-black/50' : 'relative'}
+              className={isDragged ? 'relative z-10 rounded-2xl opacity-90 shadow-lg shadow-black/50' : 'relative'}
             >
               {step.type === 'exercise' ? (
                 <ExerciseStepCard
@@ -562,14 +525,15 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
       onClose={(e) => { if (e.target === e.currentTarget) onClose() }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overscroll-contain bg-bg text-white backdrop:bg-black/60"
     >
-      <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-6">
+      {/* same side padding and column width as the screens */}
+      <div className="mx-auto flex max-w-[calc(var(--container-2xl)+2*var(--page-px))] flex-col gap-4 px-(--page-px) py-6">
         <header className="flex items-center justify-between gap-4">
-          <h2 id={titleId} className="text-3xl">Add exercise</h2>
+          <h2 id={titleId} className="text-[clamp(1.75rem,7vw,2.25rem)] font-bold leading-tight tracking-tight">Add exercise</h2>
           <button
             type="button"
             onClick={() => dialogRef.current?.close()}
             aria-label="Close exercise picker"
-            className="shrink-0 border-2 border-outline px-3 py-1 text-xl hover:border-primary"
+            className={`size-10 ${iconButton}`}
           >
             <span aria-hidden="true">✕</span>
           </button>
@@ -581,41 +545,41 @@ const ExercisePicker = ({ exercises, focus, setFocus, onPick, onClose }: {
           placeholder="Search exercises..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full border-2 border-outline bg-bg p-2 focus:border-primary focus:outline-none"
+          className={`w-full ${input}`}
         />
         <FocusSelect value={focus} onChange={setFocus} />
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="border-2 border-dashed border-outline p-3 text-left hover:border-primary hover:bg-tertiary"
+          className={dashedButton}
         >
           {/* when nothing matches, offer the search text as the name */}
           {matches.length === 0 && search.trim() ? `+ Create "${search.trim()}"` : '+ Create your own exercise'}
         </button>
         <p role="status" className="sr-only">{matches.length} exercise{matches.length === 1 ? '' : 's'} found</p>
-        <ul className="flex flex-col gap-2" aria-label="Exercises">
+        <ul className="flex flex-col gap-3" aria-label="Exercises">
           {matches.slice(0, PICKER_LIMIT).map((exercise) => (
-            <li key={exercise.id} className="flex border-2 border-outline has-[button:hover]:border-primary has-[button:focus-visible]:border-primary">
+            <li key={exercise.id} className={`flex items-center gap-2 ${card} pr-3 transition-colors has-[button:hover]:bg-surface-hover motion-reduce:transition-none`}>
               <button
                 type="button"
                 onClick={() => onPick(exercise)}
-                className="flex min-w-0 grow flex-col p-3 text-left focus-visible:outline-none"
+                className={`flex min-w-0 grow flex-col gap-2 rounded-2xl py-4 pl-5 text-left hover:cursor-pointer ${focusRing}`}
               >
-                <span>
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
                   {exercise.name}
-                  {exercise.custom && <span className="ml-2 rounded-full bg-tertiary px-2 py-0.5 text-sm">Yours</span>}
+                  {exercise.custom && <span className="rounded-full bg-bg/60 px-2 py-0.5 text-xs font-normal text-primary">Yours</span>}
                 </span>
-                <span className="text-sm capitalize opacity-70">
+                <span className="flex flex-wrap gap-2">
                   <span className="sr-only">, works </span>
-                  {exercise.primaryMuscles.join(', ')}
+                  {exercise.primaryMuscles.map((m) => <MuscleChip key={m} muscle={m} />)}
                 </span>
               </button>
-              <InfoButton onClick={() => setInfo(exercise)} label={exercise.name} className="border-l-2 border-outline px-4 text-xl" />
+              <InfoButton onClick={() => setInfo(exercise)} label={exercise.name} className={`size-10 bg-bg/60 text-lg ${iconButton}`} />
             </li>
           ))}
-          {matches.length === 0 && <li className="text-center opacity-70">No exercises found.</li>}
+          {matches.length === 0 && <li className="py-6 text-center text-white/75">No exercises found.</li>}
           {matches.length > PICKER_LIMIT && (
-            <li className="text-center text-sm opacity-70">
+            <li className="text-center text-sm text-white/75">
               Showing {PICKER_LIMIT} of {matches.length}. Search to narrow down.
             </li>
           )}
@@ -657,6 +621,10 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
   const [steps, setSteps] = useState<WorkoutStep[]>(initial.steps)
   const [focus, setFocus] = useState<Focus>(() => focusFromWorkout(initial))
   const [picking, setPicking] = useState(false)
+  // collapsed for a new workout to keep the screen calm; open when editing one that already has filters
+  const [showFilters, setShowFilters] = useState(() => !isNew && (focus.areas.length > 0 || focus.equipment.length > 0))
+  const filtersId = useId()
+  const filterCount = focus.equipment.length + focus.areas.length + focus.muscles.length
 
   const exercisesById = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises])
 
@@ -674,27 +642,46 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
         placeholder="Workout name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full border-2 border-outline bg-bg p-2 text-xl focus:border-primary focus:outline-none"
+        className={`w-full text-xl font-semibold ${input}`}
       />
 
-      <div className="flex flex-col gap-2">
-        <h2 className="text-lg">Filter exercises <span className="text-sm opacity-70">(what you have and what to work)</span></h2>
-        <FocusSelect value={focus} onChange={setFocus} />
+      <div className="flex flex-col gap-3">
+        <h2>
+          <button
+            type="button"
+            aria-expanded={showFilters}
+            aria-controls={filtersId}
+            onClick={() => setShowFilters((v) => !v)}
+            className={`flex w-full items-center justify-between gap-3 rounded-2xl bg-surface px-5 py-3 text-left hover:cursor-pointer hover:bg-tertiary ${focusRing}`}
+          >
+            <span className="flex flex-col">
+              <span className="font-semibold">
+                Filter exercises
+                {!showFilters && filterCount > 0 && <span className="font-normal text-primary"> ({filterCount})</span>}
+              </span>
+              <span className="text-sm text-white/75">What you have and what to work</span>
+            </span>
+            <span aria-hidden="true" className={`text-sm transition-transform motion-reduce:transition-none ${showFilters ? 'rotate-180' : ''}`}>▾</span>
+          </button>
+        </h2>
+        <div id={filtersId} hidden={!showFilters}>
+          <FocusSelect value={focus} onChange={setFocus} />
+        </div>
       </div>
 
       <h2 className="sr-only">Steps</h2>
-      <p className="text-sm opacity-70">
+      <p className="mt-2 text-sm text-white/75">
         {exerciseSteps.length} exercise{exerciseSteps.length === 1 ? '' : 's'} · {totalSets} set{totalSets === 1 ? '' : 's'} · ~{formatDuration(estimateSeconds(steps))}
       </p>
 
       <StepList steps={steps} setSteps={setSteps} exercisesById={exercisesById} />
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => setPicking(true)}
           aria-label="Add exercise"
-          className="border-2 border-outline p-3 hover:bg-tertiary"
+          className={dashedButton}
         >
           + Exercise
         </button>
@@ -703,7 +690,7 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
           onClick={() => setSteps((prev) => [...prev, newRestStep()])}
           disabled={steps.length === 0}
           aria-label="Add rest"
-          className="border-2 border-dashed border-secondary p-3 hover:bg-secondary/50 disabled:opacity-40 disabled:hover:bg-transparent"
+          className={`rounded-2xl border-2 border-dashed border-secondary p-4 font-semibold hover:cursor-pointer hover:bg-secondary/25 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${focusRing}`}
         >
           + Rest
         </button>
@@ -715,11 +702,11 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
             type="button"
             onClick={save}
             disabled={!canSave}
-            className="border-2 border-primary bg-primary px-4 py-2 text-bg disabled:opacity-40"
+            className={primaryButton}
           >
             Save
           </button>
-          <button type="button" onClick={onCancel} className="border-2 border-outline px-4 py-2 hover:border-primary">
+          <button type="button" onClick={onCancel} className={softButton}>
             Cancel
           </button>
         </div>
@@ -727,7 +714,7 @@ const WorkoutEditor = ({ initial, isNew, exercises, onSave, onDelete, onCancel }
           <button
             type="button"
             onClick={() => { if (confirm(`Delete "${initial.name}"?`)) onDelete() }}
-            className="underline hover:text-primary"
+            className="rounded-full px-3 py-2 text-sm underline hover:cursor-pointer hover:text-primary"
           >
             Delete workout
           </button>
@@ -795,42 +782,20 @@ export default function Workouts({ setScreen }: { setScreen: (screen: Screen) =>
           onCancel={() => setEditing(null)}
         />
       ) : (
-        <section className="flex w-full max-w-2xl grow flex-col items-center gap-4">
-          <ul className="flex w-full flex-col gap-3">
-            {workouts.map((workout) => {
-              const count = workout.steps.filter((s) => s.type === 'exercise').length
-              return (
-                <li key={workout.id} className="relative flex w-full flex-col gap-1 border-2 border-outline p-4 hover:border-primary has-[button:focus-visible]:border-primary">
-                  <h2 className="text-xl wrap-break-word">
-                    {/* ::after stretches the click target over the whole card */}
-                    <button
-                      type="button"
-                      onClick={() => setEditing(workout)}
-                      aria-label={`Edit ${workout.name}`}
-                      className="text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
-                    >
-                      {workout.name}
-                    </button>
-                  </h2>
-                  <p className="text-sm opacity-70">
-                    {count} exercise{count === 1 ? '' : 's'} · ~{formatDuration(estimateSeconds(workout.steps))}
-                  </p>
-                  {describeFocus(focusFromWorkout(workout)) && (
-                    <p className="text-sm capitalize">{describeFocus(focusFromWorkout(workout))}</p>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-          {workouts.length === 0 && <p className="opacity-70">No workouts yet.</p>}
-          <button
-            type="button"
-            aria-label="New workout"
-            className="p-8 rounded-full border-solid border-8 border-outline text-5xl aspect-square hover:bg-tertiary hover:cursor-pointer"
-            onClick={() => setEditing(newWorkout())}
-          >
-            +
+        <section className="flex w-full max-w-2xl grow flex-col gap-3">
+          {/* same place and style as "+ New exercise" on the Exercises screen */}
+          <button type="button" className={`w-full ${dashedButton}`} onClick={() => setEditing(newWorkout())}>
+            + New workout
           </button>
+          {workouts.length > 0 ? (
+            <ul className="flex w-full flex-col gap-3">
+              {workouts.map((workout) => (
+                <WorkoutCard key={workout.id} workout={workout} actionLabel="Edit" onSelect={() => setEditing(workout)} />
+              ))}
+            </ul>
+          ) : (
+            <p className="py-6 text-center text-white/75">No workouts yet.</p>
+          )}
           <DataNote />
         </section>
       )}

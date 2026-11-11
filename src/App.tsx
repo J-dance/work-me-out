@@ -31,7 +31,11 @@ function App() {
       }}>
         {/* outside ExerciseProvider so they still show while exercises load or fail to load */}
         <OfflineStatus />
-        {screen === 'menu' && <InstallNotice />}
+        {screen === 'menu' && (
+          <div className="flex w-full justify-center px-(--page-px) pt-6 empty:hidden">
+            <InstallNotice />
+          </div>
+        )}
         <ExerciseProvider>
           {/* keyed by screen: each screen gets its own boundary, and switching screens clears any error */}
           <ScreenErrorBoundary
