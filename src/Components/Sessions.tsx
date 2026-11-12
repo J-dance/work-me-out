@@ -1,7 +1,7 @@
 import Layout from "./Layout";
 import type { Exercise, Screen, Workout } from "../types";
 import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from "react";
-import { formatDuration, loadWorkouts, playBeep, speakDuration, Timer, unlockAudio, useFillViewport, useFocusOnChange, useWakeLock } from "../utils";
+import { formatDuration, loadWorkouts, playBeep, playStartBeep, speakDuration, Timer, unlockAudio, useFillViewport, useFocusOnChange, useWakeLock } from "../utils";
 import { useExercises } from "../context";
 import ExerciseImage from "./ExerciseImage";
 import ExerciseModal from "./ExerciseModal";
@@ -20,7 +20,7 @@ type Phase =
     set: number
     sets: number
     reps: number | null
-    /** Seconds, null if the set is reps only (advanced manually) */
+    /** Seconds to count down from. Null if the set has no time: it counts up from 0:00 until Done is pressed. */
     duration: number | null
   }
   | {
@@ -110,7 +110,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
 
   const [index, setIndex] = useState(0)
   const [status, setStatus] = useState<Status>('ready')
-  const [remaining, setRemaining] = useState<number | null>(phases[0]?.duration ?? null) // seconds
+  const [remaining, setRemaining] = useState<number | null>(phases[0] ? phases[0].duration ?? 0 : null) // seconds left, or elapsed for untimed sets; null once done
   const [info, setInfo] = useState<Exercise | null>(null)
 
   const timerRef = useRef<Timer | null>(null)
@@ -123,8 +123,10 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
   /**
    * Moves to a phase and loads its time into the timer.
    * The timer only starts if the session is running.
+   * A new exercise clock announces itself with a long beep, unless `afterFinish`: the previous timer just ran out and beeped.
+   * Rests never get the start beep.
    */
-  const goTo = (i: number, nextStatus: Status) => {
+  const goTo = (i: number, nextStatus: Status, afterFinish = false) => {
     const timer = timerRef.current
     timer?.stopTimer()
     const phase = phases[i]
@@ -136,17 +138,22 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
     }
     setIndex(i)
     setStatus(nextStatus)
-    setRemaining(phase.duration)
-    if (phase.duration !== null && timer) {
-      timer.setDuration(phase.duration)
-      if (nextStatus === 'running') timer.startTimer()
+    // no time set: a stopwatch counting up from 0
+    setRemaining(phase.duration ?? 0)
+    if (timer) {
+      timer.setCountUp(phase.duration === null)
+      timer.setDuration(phase.duration ?? 0)
+      if (nextStatus === 'running') {
+        timer.startTimer()
+        if (!afterFinish && phase.kind === 'work') playStartBeep()
+      }
     }
   }
 
   // effect event: always sees the latest index/goTo, so the Timer (created once) never calls a stale one
   const onTimerFinish = useEffectEvent(() => {
     playBeep()
-    goTo(index + 1, 'running')
+    goTo(index + 1, 'running', true)
   })
 
   // create the Timer once on mount, and stop it on unmount
@@ -169,7 +176,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
   const phase = phases[index] as Phase | undefined
   const upNext = phases[index + 1] as Phase | undefined
   const afterNext = phases[index + 2] as Phase | undefined
-  const isTimed = phase?.duration != null
+  const isCountdown = phase?.duration != null
 
   const pause = () => {
     timerRef.current?.stopTimer()
@@ -180,6 +187,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
     unlockAudio()
     const timer = timerRef.current
     if (timer && remaining !== null) {
+      timer.setCountUp(!isCountdown)
       timer.setDuration(remaining)
       timer.startTimer()
     }
@@ -193,7 +201,7 @@ function WorkoutComponent({ workout, onExit }: { workout: Workout, onExit: () =>
     ? { label: 'Start', onClick: () => { unlockAudio(); goTo(index, 'running') } }
     : status === 'paused'
       ? { label: 'Resume', onClick: resume }
-      : isTimed
+      : isCountdown
         ? { label: 'Pause', onClick: pause }
         : { label: 'Done', onClick: () => goTo(index + 1, 'running') }
 
@@ -270,7 +278,7 @@ function CurrentPhase({ phase, remaining, status, onInfo }: {
 }) {
   const clock = remaining !== null && (
     // role="timer" is not live by default, so it doesn't announce every second
-    <p role="timer" aria-label="Time remaining" className={`text-6xl leading-none font-bold sm:text-7xl tracking-tight tabular-nums select-none ${status === 'paused' ? 'opacity-50' : ''}`}>
+    <p role="timer" aria-label={phase.kind === 'work' && phase.duration === null ? 'Time elapsed' : 'Time remaining'} className={`text-6xl leading-none font-bold sm:text-7xl tracking-tight tabular-nums select-none ${status === 'paused' ? 'opacity-50' : ''}`}>
       <span aria-hidden="true">{formatDuration(remaining)}</span>
       <span className="sr-only">{speakDuration(remaining)}{status === 'paused' ? ', paused' : ''}</span>
     </p>

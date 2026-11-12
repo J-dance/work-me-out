@@ -59,8 +59,14 @@ export const useFillViewport = <T extends HTMLElement>(minHeight: number, bottom
   return ref
 }
 
+/**
+ * Counts down from `duration` seconds and calls onFinish at 0.
+ * In count-up mode (see setCountUp) it is a stopwatch instead: `duration` is the seconds already
+ * elapsed to start from, onUpdate gets the elapsed seconds, and it runs until stopped.
+ */
 export class Timer {
   private duration: number
+  private countUp = false
   private endTime: number = 0
   private interval: ReturnType<typeof setInterval> | undefined
 
@@ -77,6 +83,10 @@ export class Timer {
     this.duration = duration
   }
 
+  public setCountUp(countUp: boolean): void {
+    this.countUp = countUp
+  }
+
   public setEndTime(endTime: number): void {
     this.endTime = endTime
   }
@@ -91,7 +101,8 @@ export class Timer {
    * Starts the timer. Time is calculated based of real date/times data.
    */
   public startTimer() {
-    this.setEndTime(Date.now() + this.duration * 1000)
+    // counting up: endTime holds the moment the stopwatch (virtually) started
+    this.setEndTime(this.countUp ? Date.now() - this.duration * 1000 : Date.now() + this.duration * 1000)
 
     this.setInterval(setInterval(() => { this.updateTimer() }, 100)) // 100ms
   }
@@ -103,6 +114,10 @@ export class Timer {
    */
   public updateTimer() {
     try {
+      if (this.countUp) {
+        this.onUpdate(Math.floor((Date.now() - this.endTime) / 1000))
+        return
+      }
       const remaining = Math.max(
         0,
         this.endTime - Date.now()
@@ -286,28 +301,42 @@ export const unlockAudio = () => {
   }
 }
 
-/** Two rounds of three beeps for when a timer finishes. Does nothing if audio was never unlocked. */
+/** Pitch of every beep: A5, a clear "timer" pitch. */
+const BEEP_HZ = 880
+
+/** Peak volume of every beep. */
+const BEEP_VOLUME = 0.8
+
+/** Plays one beep of `length` seconds starting at `start` (AudioContext time). */
+const beepAt = (ctx: AudioContext, start: number, length: number) => {
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  // square wave carries far more energy than a sine, so it cuts through music/noise
+  osc.type = 'square'
+  osc.frequency.value = BEEP_HZ
+  // quick fade in/out avoids clicks
+  gain.gain.setValueAtTime(0.0001, start)
+  gain.gain.exponentialRampToValueAtTime(BEEP_VOLUME, start + 0.01)
+  gain.gain.setValueAtTime(BEEP_VOLUME, start + length - 0.05)
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + length)
+  osc.connect(gain).connect(ctx.destination)
+  osc.start(start)
+  osc.stop(start + length + 0.02)
+}
+
+/** Two rounds of three short beeps for when a timer finishes. Does nothing if audio was never unlocked. */
 export const playBeep = () => {
   if (!audioCtx) return
   const now = audioCtx.currentTime
   for (let round = 0; round < 2; round++) {
-    for (let i = 0; i < 3; i++) {
-      const osc = audioCtx.createOscillator()
-      const gain = audioCtx.createGain()
-      // square wave carries far more energy than a sine, so it cuts through music/noise
-      osc.type = 'square'
-      osc.frequency.value = 880 // A5, a clear "timer" pitch
-      const t = now + round * 1 + i * 0.25
-      // quick fade in/out avoids clicks
-      gain.gain.setValueAtTime(0.0001, t)
-      gain.gain.exponentialRampToValueAtTime(0.8, t + 0.01)
-      gain.gain.setValueAtTime(0.8, t + 0.15)
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2)
-      osc.connect(gain).connect(audioCtx.destination)
-      osc.start(t)
-      osc.stop(t + 0.22)
-    }
+    for (let i = 0; i < 3; i++) beepAt(audioCtx, now + round * 1 + i * 0.25, 0.2)
   }
+}
+
+/** One long beep for when an exercise clock starts without a timer having just finished (first start, skip, going back). */
+export const playStartBeep = () => {
+  if (!audioCtx) return
+  beepAt(audioCtx, audioCtx.currentTime, 0.8)
 }
 
 /**
